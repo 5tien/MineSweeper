@@ -39,7 +39,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  font-family: "Arial Rounded MT Bold", "Trebuchet MS", Arial, sans-serif;
+  font-family: "Arial Rounded MT Bold", "Arial Black", "Trebuchet MS", Arial, sans-serif;
   letter-spacing: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -104,52 +104,65 @@ button:focus-visible {
 }
 
 .round-button svg {
-  width: 33px;
-  height: 33px;
+  width: 35px;
+  height: 35px;
 }
 
 .reset-button {
-  right: 26px;
+  right: 24px;
 }
 
 .counter {
-  width: 89px;
-  height: 37px;
+  width: 106px;
+  height: 42px;
   position: absolute;
-  top: 14px;
+  top: 12px;
   display: grid;
-  grid-template-rows: 14px 20px;
+  grid-template-rows: 15px 24px;
   place-items: center;
-  border-radius: 5px;
+  border-radius: 6px;
   background: var(--panel);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  padding-top: 1px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 1px 1px rgba(0, 0, 0, 0.12);
 }
 
 .counter span {
   align-self: end;
-  font-size: 9px;
-  line-height: 9px;
-  font-weight: 900;
+  max-width: 98px;
+  font-size: 8.5px;
+  line-height: 8.5px;
+  font-weight: 1000;
   color: #ffffff;
+  -webkit-text-stroke: 0.2px currentColor;
+  paint-order: stroke fill;
+  white-space: nowrap;
 }
 
 .counter strong {
   align-self: start;
-  font-size: 20px;
-  line-height: 21px;
-  font-weight: 900;
+  font-size: 23px;
+  line-height: 24px;
+  font-weight: 1000;
+  -webkit-text-stroke: 0.45px currentColor;
+  paint-order: stroke fill;
+  text-shadow:
+    0.45px 0 currentColor,
+    -0.45px 0 currentColor,
+    0 0.45px currentColor;
 }
 
 .counter-current {
-  left: 59px;
+  left: 43px;
 }
 
 .crowned-counter {
   position: absolute;
-  left: 162px;
+  left: 163px;
   top: 0;
-  width: 89px;
-  height: 51px;
+  width: 106px;
+  height: 56px;
 }
 
 .crowned-counter .counter {
@@ -160,7 +173,7 @@ button:focus-visible {
   width: 44px;
   height: 18px;
   position: absolute;
-  left: 22px;
+  left: 31px;
   top: 0;
   fill: var(--panel);
 }
@@ -190,10 +203,21 @@ button:focus-visible {
   padding: 0;
   font-size: 30px;
   line-height: 34px;
-  font-weight: 900;
+  font-family: "Arial Black", "Arial Rounded MT Bold", "Trebuchet MS", Arial, sans-serif;
+  font-weight: 1000;
   cursor: pointer;
   position: relative;
   transition: background-color 90ms ease, filter 90ms ease;
+}
+
+.cell[data-count] {
+  -webkit-text-stroke: 0.7px currentColor;
+  paint-order: stroke fill;
+  text-shadow:
+    0.65px 0 currentColor,
+    -0.65px 0 currentColor,
+    0 0.65px currentColor,
+    0 -0.65px currentColor;
 }
 
 .cell.hidden,
@@ -295,29 +319,41 @@ button:focus-visible {
 }
 
 .mine-pill {
-  width: 72px;
-  height: 36px;
+  width: 86px;
+  height: 40px;
   position: absolute;
-  left: 29px;
-  top: 10px;
+  left: 20px;
+  top: 9px;
   display: grid;
-  grid-template-columns: 30px 1fr;
+  grid-template-columns: 31px minmax(38px, 1fr);
+  column-gap: 3px;
   align-items: center;
   border-radius: 18px;
   background: var(--soft);
   color: var(--ink);
-  padding-left: 9px;
+  padding: 0 9px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 1px 1px rgba(0, 0, 0, 0.13);
 }
 
 .mine-pill svg {
-  width: 25px;
-  height: 25px;
+  width: 27px;
+  height: 27px;
+  justify-self: center;
 }
 
 .mine-pill strong {
-  font-size: 23px;
+  min-width: 34px;
+  font-size: 22px;
   line-height: 24px;
-  font-weight: 900;
+  font-family: "Arial Black", "Arial Rounded MT Bold", "Trebuchet MS", Arial, sans-serif;
+  font-weight: 1000;
+  -webkit-text-stroke: 0.45px currentColor;
+  paint-order: stroke fill;
+  text-shadow:
+    0.45px 0 currentColor,
+    -0.45px 0 currentColor,
+    0 0.45px currentColor;
+  text-align: center;
   transform: translateY(-1px);
 }
 
@@ -326,21 +362,23 @@ button:focus-visible {
 }
 
 .mode-switch {
-  width: 127px;
-  height: 58px;
+  width: 154px;
+  height: 62px;
   position: absolute;
-  left: 123px;
-  top: 0;
+  left: 111px;
+  top: -2px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   overflow: hidden;
-  border: 4px solid #222c35;
+  border: 5px solid #222c35;
   border-radius: 6px;
   background: #879bab;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 1px rgba(0, 0, 0, 0.22);
 }
 
 .tool-button {
+  min-width: 70px;
+  min-height: 52px;
   width: 100%;
   height: 100%;
   border: 0;
@@ -355,11 +393,12 @@ button:focus-visible {
 }
 
 .tool-button + .tool-button {
-  border-left: 3px solid #222c35;
+  border-left: 5px solid #222c35;
 }
 
 .tool-button.selected {
   background: var(--green);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.15);
 }
 
 .mode-switch.mode-switch-pop {
@@ -371,15 +410,15 @@ button:focus-visible {
 }
 
 .tool-button svg {
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  height: 46px;
 }
 
 .hint-button {
   width: 47px;
   height: 47px;
   position: absolute;
-  left: 286px;
+  left: 295px;
   top: 5px;
   border: 0;
   border-radius: 50%;
@@ -411,7 +450,10 @@ button:focus-visible {
   color: #6d7781;
   font-size: 12px;
   line-height: 12px;
-  font-weight: 900;
+  font-family: "Arial Black", "Arial Rounded MT Bold", "Trebuchet MS", Arial, sans-serif;
+  font-weight: 1000;
+  -webkit-text-stroke: 0.25px currentColor;
+  paint-order: stroke fill;
 }
 
 .reset-button.reset-spin svg {
