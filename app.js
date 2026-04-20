@@ -1,31 +1,9 @@
 const ROWS = 14;
 const COLS = 9;
-const MINES = 22;
+const MIN_MINES = 16;
+const MAX_MINES = 28;
 const DESIGN_WIDTH = 375;
-const DESIGN_HEIGHT = 768;
-
-const PRESET_MINES = [
-  [2, 2], [2, 4], [2, 5], [2, 8], [3, 1], [3, 8],
-  [4, 1], [5, 1], [5, 8], [6, 1], [8, 7], [8, 8],
-  [9, 5], [9, 7], [10, 3], [11, 3], [12, 0], [12, 3],
-  [12, 4], [12, 6], [13, 7], [13, 8],
-];
-
-const PRESET_REVEALED = [
-  [3, 2], [3, 3], [3, 4], [3, 5], [3, 6], [3, 7],
-  [4, 2], [4, 3], [4, 4], [4, 5], [4, 6], [4, 7],
-  [5, 2], [5, 3], [5, 4], [5, 5], [5, 6], [5, 7],
-  [6, 2], [6, 3], [6, 4], [6, 5], [6, 6], [6, 7],
-  [7, 0], [7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6], [7, 7],
-  [8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 6],
-  [9, 0], [9, 1], [9, 2], [9, 3], [9, 4], [9, 6],
-  [10, 0], [10, 1], [10, 2], [10, 4], [10, 5], [10, 6],
-  [11, 0], [11, 1], [11, 2], [11, 4], [11, 5], [11, 6],
-];
-
-const PRESET_FLAGS = [
-  [6, 1], [8, 7], [9, 5], [10, 3], [11, 3],
-];
+const MAX_SCALE = 1.16;
 
 const boardEl = document.querySelector("#board");
 const mineCountEl = document.querySelector("#mineCount");
@@ -33,10 +11,15 @@ const currentStreakEl = document.querySelector("#currentStreak");
 const allTimeEl = document.querySelector("#allTime");
 const digModeButton = document.querySelector("#digMode");
 const flagModeButton = document.querySelector("#flagMode");
+const modeSwitchEl = document.querySelector(".mode-switch");
+const resetButton = document.querySelector(".reset-button");
+const hintButton = document.querySelector(".hint-button");
+const minePillEl = document.querySelector(".mine-pill");
 
-const storageKey = "photo-minesweeper-scores";
+const storageKey = "minesweeper-scores-v2";
 const savedScores = readSavedScores();
-let scores = savedScores || { current: 1, best: 8 };
+let scores = savedScores || { current: 0, best: 0 };
+let mineTotal = chooseMineTotal();
 let mode = "flag";
 let mines = new Set();
 let revealed = new Set();
@@ -44,12 +27,21 @@ let flags = new Set();
 let gameOver = false;
 let hasFirstMove = false;
 let suppressNextClick = false;
+let revealAnimationCells = new Set();
+let revealAnimationOrigin = null;
+let revealAnimationTimer = 0;
+let boardDropTimer = 0;
+let boardShakeTimer = 0;
+let boardWinTimer = 0;
+let flagAnimationCells = new Set();
+let unflagAnimationCells = new Set();
+let flagAnimationTimer = 0;
+let suppressClickTimer = 0;
 
 function setAppScale() {
   const viewport = window.visualViewport;
   const viewportWidth = viewport ? viewport.width : window.innerWidth;
-  const viewportHeight = viewport ? viewport.height : window.innerHeight;
-  const scale = Math.min(viewportWidth / DESIGN_WIDTH, viewportHeight / DESIGN_HEIGHT);
+  const scale = Math.min(viewportWidth / DESIGN_WIDTH, MAX_SCALE);
   document.documentElement.style.setProperty("--app-scale", Math.max(0.1, scale).toFixed(4));
 }
 
@@ -93,7 +85,16 @@ function registerServiceWorker() {
 function readSavedScores() {
   try {
     const value = localStorage.getItem(storageKey);
-    return value ? JSON.parse(value) : null;
+    if (!value) return null;
+
+    const parsed = JSON.parse(value);
+    const current = Number.isFinite(parsed.current) ? parsed.current : 0;
+    const best = Number.isFinite(parsed.best) ? parsed.best : 0;
+
+    return {
+      current: Math.max(0, Math.floor(current)),
+      best: Math.max(0, Math.floor(best)),
+    };
   } catch {
     return null;
   }
@@ -101,10 +102,6 @@ function readSavedScores() {
 
 function key(row, col) {
   return `${row},${col}`;
-}
-
-function fromPairs(pairs) {
-  return new Set(pairs.map(([row, col]) => key(row, col)));
 }
 
 function neighbors(row, col) {
@@ -160,6 +157,25 @@ function renderMode() {
   flagModeButton.classList.toggle("selected", mode === "flag");
 }
 
+function replayElementAnimation(element, className, duration = 520) {
+  if (!element) return;
+
+  element.classList.remove(className);
+  void element.offsetWidth;
+  element.classList.add(className);
+  window.setTimeout(() => {
+    element.classList.remove(className);
+  }, duration);
+}
+
+function suppressSyntheticClick() {
+  window.clearTimeout(suppressClickTimer);
+  suppressNextClick = true;
+  suppressClickTimer = window.setTimeout(() => {
+    suppressNextClick = false;
+  }, 700);
+}
+
 function renderBoard() {
   const cells = [];
 
@@ -174,9 +190,13 @@ function renderBoard() {
       let label = `Cell ${row + 1}, ${col + 1}`;
       let content = "";
       let dataCount = "";
+      const revealDelay = revealAnimationOrigin
+        ? (Math.abs(row - revealAnimationOrigin[0]) + Math.abs(col - revealAnimationOrigin[1])) * 22
+        : 0;
 
       if (isRevealed) {
         className += " revealed";
+        if (revealAnimationCells.has(id) && !isMine) className += " revealed-new";
         if (isMine) {
           className += " mine";
           content = makeMineSvg();
@@ -189,17 +209,18 @@ function renderBoard() {
           dataCount = ' data-count="0"';
           label += ", empty";
         }
-      } else if (gameOver && isMine) {
-        className += " mine";
-        if (!isFlagged) className += " hidden";
-        content = makeMineSvg();
-        label += ", mine";
       } else if (isFlagged) {
         className += " flagged";
+        if (flagAnimationCells.has(id)) className += " flag-new";
         content = makeFlagSvg();
         label += ", flagged";
+      } else if (gameOver && isMine) {
+        className += " mine mine-reveal hidden";
+        content = makeMineSvg();
+        label += ", mine";
       } else {
         className += " hidden";
+        if (unflagAnimationCells.has(id)) className += " flag-removed";
       }
 
       cells.push(`
@@ -208,6 +229,7 @@ function renderBoard() {
           type="button"
           data-row="${row}"
           data-col="${col}"
+          style="--drop-delay: ${row * 18 + col * 5}ms; --reveal-delay: ${revealDelay}ms; --mine-delay: ${(row + col) * 18}ms"
           ${dataCount}
           aria-label="${label}"
         >${content}</button>
@@ -216,7 +238,61 @@ function renderBoard() {
   }
 
   boardEl.innerHTML = cells.join("");
-  mineCountEl.textContent = MINES;
+  mineCountEl.textContent = Math.max(0, mineTotal - flags.size);
+}
+
+function triggerBoardDrop() {
+  window.clearTimeout(boardDropTimer);
+  boardEl.classList.remove("board-drop");
+  void boardEl.offsetWidth;
+  boardEl.classList.add("board-drop");
+  boardDropTimer = window.setTimeout(() => {
+    boardEl.classList.remove("board-drop");
+  }, 950);
+}
+
+function triggerBoardShake() {
+  window.clearTimeout(boardShakeTimer);
+  boardEl.classList.remove("board-shake");
+  void boardEl.offsetWidth;
+  boardEl.classList.add("board-shake");
+  boardShakeTimer = window.setTimeout(() => {
+    boardEl.classList.remove("board-shake");
+  }, 520);
+}
+
+function triggerWinAnimation() {
+  window.clearTimeout(boardWinTimer);
+  boardEl.classList.remove("board-win");
+  void boardEl.offsetWidth;
+  boardEl.classList.add("board-win");
+  replayElementAnimation(currentStreakEl.parentElement, "counter-pop", 620);
+  replayElementAnimation(allTimeEl.parentElement, "counter-pop", 620);
+  boardWinTimer = window.setTimeout(() => {
+    boardEl.classList.remove("board-win");
+  }, 1200);
+}
+
+function markRevealAnimation(previousRevealed, originRow, originCol) {
+  window.clearTimeout(revealAnimationTimer);
+  revealAnimationCells = new Set(
+    [...revealed].filter((id) => !previousRevealed.has(id))
+  );
+  revealAnimationOrigin = [originRow, originCol];
+  revealAnimationTimer = window.setTimeout(() => {
+    revealAnimationCells = new Set();
+    revealAnimationOrigin = null;
+  }, 850);
+}
+
+function markFlagAnimation(id, isFlagging) {
+  window.clearTimeout(flagAnimationTimer);
+  flagAnimationCells = isFlagging ? new Set([id]) : new Set();
+  unflagAnimationCells = isFlagging ? new Set() : new Set([id]);
+  flagAnimationTimer = window.setTimeout(() => {
+    flagAnimationCells = new Set();
+    unflagAnimationCells = new Set();
+  }, 520);
 }
 
 function revealGroup(startRow, startCol) {
@@ -244,9 +320,10 @@ function revealCell(row, col) {
   if (gameOver) return;
   const id = key(row, col);
   if (flags.has(id) || revealed.has(id)) return;
+  const previousRevealed = new Set(revealed);
 
   if (!hasFirstMove) {
-    protectFirstMove(row, col);
+    placeMinesAroundOpening(row, col);
     hasFirstMove = true;
   }
 
@@ -258,10 +335,13 @@ function revealCell(row, col) {
     renderBoard();
     const button = boardEl.querySelector(`[data-row="${row}"][data-col="${col}"]`);
     if (button) button.classList.add("exploded");
+    triggerBoardShake();
+    replayElementAnimation(currentStreakEl.parentElement, "counter-drop", 520);
     return;
   }
 
   revealGroup(row, col);
+  markRevealAnimation(previousRevealed, row, col);
   checkWin();
   renderBoard();
 }
@@ -273,16 +353,24 @@ function toggleFlag(row, col) {
 
   if (flags.has(id)) {
     flags.delete(id);
+    markFlagAnimation(id, false);
   } else {
+    if (flags.size >= mineTotal) {
+      replayElementAnimation(minePillEl, "mine-pill-pop", 420);
+      return;
+    }
+
     flags.add(id);
+    markFlagAnimation(id, true);
   }
 
+  replayElementAnimation(minePillEl, "mine-pill-pop", 420);
   checkWin();
   renderBoard();
 }
 
 function checkWin() {
-  const safeCells = ROWS * COLS - MINES;
+  const safeCells = ROWS * COLS - mineTotal;
   if (revealed.size !== safeCells) return;
 
   gameOver = true;
@@ -292,63 +380,67 @@ function checkWin() {
   scores.current += 1;
   scores.best = Math.max(scores.best, scores.current);
   renderScores();
+  triggerWinAnimation();
 }
 
-function protectFirstMove(row, col) {
-  const id = key(row, col);
-  if (!mines.has(id)) return;
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
-  mines.delete(id);
-  for (let nextRow = 0; nextRow < ROWS; nextRow += 1) {
-    for (let nextCol = 0; nextCol < COLS; nextCol += 1) {
-      const nextId = key(nextRow, nextCol);
-      if (nextId !== id && !mines.has(nextId)) {
-        mines.add(nextId);
-        return;
-      }
+function chooseMineTotal() {
+  return randomInt(MIN_MINES, MAX_MINES);
+}
+
+function shuffled(values) {
+  const copy = [...values];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+  return copy;
+}
+
+function placeMinesAroundOpening(openingRow, openingCol) {
+  const reserved = new Set([
+    key(openingRow, openingCol),
+    ...neighbors(openingRow, openingCol).map(([row, col]) => key(row, col)),
+  ]);
+  const allCells = [];
+
+  for (let row = 0; row < ROWS; row += 1) {
+    for (let col = 0; col < COLS; col += 1) {
+      const id = key(row, col);
+      if (!reserved.has(id)) allCells.push(id);
     }
   }
-}
 
-function loadPreset() {
-  mines = fromPairs(PRESET_MINES);
-  revealed = fromPairs(PRESET_REVEALED);
-  flags = fromPairs(PRESET_FLAGS);
-  gameOver = false;
-  hasFirstMove = true;
-  mode = "flag";
-  renderMode();
-  renderScores();
-  renderBoard();
+  mines = new Set(shuffled(allCells).slice(0, mineTotal));
 }
 
 function loadRandomBoard() {
-  const allCells = [];
-  for (let row = 0; row < ROWS; row += 1) {
-    for (let col = 0; col < COLS; col += 1) {
-      allCells.push(key(row, col));
-    }
-  }
-
+  mineTotal = chooseMineTotal();
   mines = new Set();
-  while (mines.size < MINES) {
-    mines.add(allCells[Math.floor(Math.random() * allCells.length)]);
-  }
-
   revealed = new Set();
   flags = new Set();
+  revealAnimationCells = new Set();
+  revealAnimationOrigin = null;
+  flagAnimationCells = new Set();
+  unflagAnimationCells = new Set();
   gameOver = false;
   hasFirstMove = false;
   mode = "dig";
+  boardEl.classList.remove("board-shake", "board-win");
   renderMode();
   renderScores();
   renderBoard();
+  triggerBoardDrop();
 }
 
 boardEl.addEventListener("click", (event) => {
   const cell = event.target.closest(".cell");
   if (!cell) return;
   if (suppressNextClick) {
+    window.clearTimeout(suppressClickTimer);
     suppressNextClick = false;
     return;
   }
@@ -376,7 +468,7 @@ boardEl.addEventListener("pointerdown", (event) => {
   if (!cell || event.pointerType === "mouse") return;
   pressTimer = window.setTimeout(() => {
     toggleFlag(Number(cell.dataset.row), Number(cell.dataset.col));
-    suppressNextClick = true;
+    suppressSyntheticClick();
     pressTimer = 0;
   }, 420);
 });
@@ -391,20 +483,33 @@ boardEl.addEventListener("pointerleave", () => {
   pressTimer = 0;
 });
 
+boardEl.addEventListener("pointercancel", () => {
+  if (pressTimer) window.clearTimeout(pressTimer);
+  pressTimer = 0;
+});
+
 digModeButton.addEventListener("click", () => {
   mode = "dig";
   renderMode();
+  replayElementAnimation(digModeButton, "tool-pop", 330);
+  replayElementAnimation(modeSwitchEl, "mode-switch-pop", 330);
 });
 
 flagModeButton.addEventListener("click", () => {
   mode = "flag";
   renderMode();
+  replayElementAnimation(flagModeButton, "tool-pop", 330);
+  replayElementAnimation(modeSwitchEl, "mode-switch-pop", 330);
 });
 
-document.querySelector(".back-button").addEventListener("click", loadPreset);
-document.querySelector(".reset-button").addEventListener("click", loadRandomBoard);
-document.querySelector(".hint-button").addEventListener("click", () => {
+resetButton.addEventListener("click", () => {
+  replayElementAnimation(resetButton, "reset-spin", 560);
+  loadRandomBoard();
+});
+
+hintButton.addEventListener("click", () => {
   if (gameOver) return;
+  replayElementAnimation(hintButton, "hint-pulse", 650);
   const safeHidden = [];
   for (let row = 0; row < ROWS; row += 1) {
     for (let col = 0; col < COLS; col += 1) {
@@ -416,12 +521,13 @@ document.querySelector(".hint-button").addEventListener("click", () => {
   }
   const pick = safeHidden[Math.floor(Math.random() * safeHidden.length)];
   if (pick) revealCell(pick[0], pick[1]);
+  if (!pick) replayElementAnimation(hintButton, "hint-empty", 360);
 });
 
 renderScores();
 renderMode();
-loadPreset();
 setAppScale();
+loadRandomBoard();
 lockPageZoom();
 registerServiceWorker();
 

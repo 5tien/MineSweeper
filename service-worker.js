@@ -1,13 +1,15 @@
-const CACHE_NAME = "minesweeper-pwa-v1";
+const CACHE_NAME = "minesweeper-pwa-v8";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./manifest.webmanifest",
-  "./icons/icon.svg",
+  "./icons/logo-source.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
+  "./icons/maskable-192.png",
+  "./icons/maskable-512.png",
 ];
 
 self.addEventListener("install", (event) => {

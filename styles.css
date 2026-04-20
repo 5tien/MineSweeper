@@ -36,12 +36,13 @@ body {
   color: white;
   width: 100%;
   min-height: 100svh;
-  height: 100dvh;
-  display: grid;
-  place-items: center;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
   font-family: "Arial Rounded MT Bold", "Trebuchet MS", Arial, sans-serif;
   letter-spacing: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
@@ -61,6 +62,8 @@ button:focus-visible {
   width: calc(375px * var(--app-scale));
   height: calc(768px * var(--app-scale));
   position: relative;
+  flex: 0 0 auto;
+  margin-inline: auto;
   overflow: hidden;
 }
 
@@ -105,12 +108,8 @@ button:focus-visible {
   height: 33px;
 }
 
-.back-button {
-  left: 8px;
-}
-
 .reset-button {
-  right: 25px;
+  right: 26px;
 }
 
 .counter {
@@ -142,12 +141,12 @@ button:focus-visible {
 }
 
 .counter-current {
-  left: 82px;
+  left: 59px;
 }
 
 .crowned-counter {
   position: absolute;
-  left: 184px;
+  left: 162px;
   top: 0;
   width: 89px;
   height: 51px;
@@ -193,6 +192,7 @@ button:focus-visible {
   line-height: 34px;
   font-weight: 900;
   cursor: pointer;
+  position: relative;
   transition: background-color 90ms ease, filter 90ms ease;
 }
 
@@ -202,8 +202,27 @@ button:focus-visible {
   box-shadow: inset 0 0 0 1px var(--tile-edge), 0 1px 1px rgba(0, 0, 0, 0.08);
 }
 
+.board.board-drop .cell.hidden,
+.board.board-drop .cell.flagged {
+  animation: tileDropIn 440ms cubic-bezier(0.18, 0.88, 0.25, 1.18) both;
+  animation-delay: var(--drop-delay);
+}
+
 .cell.revealed {
   cursor: default;
+}
+
+.cell.revealed-new::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 4px;
+  pointer-events: none;
+  background: var(--tile);
+  box-shadow: inset 0 0 0 1px var(--tile-edge), 0 1px 1px rgba(0, 0, 0, 0.08);
+  animation: tileFallAway 520ms cubic-bezier(0.21, 0.77, 0.26, 1) both;
+  animation-delay: var(--reveal-delay);
 }
 
 .cell[data-count="1"] {
@@ -232,15 +251,41 @@ button:focus-visible {
   transform: translate(-1px, 1px);
 }
 
+.cell.flag-new svg {
+  animation: flagPlant 360ms cubic-bezier(0.18, 0.9, 0.25, 1.22) both;
+  transform-origin: 68% 82%;
+}
+
+.cell.flag-removed::after {
+  content: "";
+  width: 16px;
+  height: 14px;
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  border-radius: 1px;
+  pointer-events: none;
+  background: var(--red);
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
+  animation: flagFlyAway 340ms ease-out both;
+}
+
 .cell.mine {
   background: #f5f5f6;
   color: var(--ink);
   box-shadow: inset 0 0 0 1px var(--tile-edge);
 }
 
+.cell.mine-reveal svg {
+  animation: minePop 390ms cubic-bezier(0.18, 0.88, 0.25, 1.18) both;
+  animation-delay: var(--mine-delay);
+}
+
 .cell.exploded {
   background: #ff6963;
   color: var(--ink);
+  animation: mineExplode 520ms cubic-bezier(0.18, 0.88, 0.2, 1.18) both;
+  z-index: 3;
 }
 
 .toolbar {
@@ -274,6 +319,10 @@ button:focus-visible {
   line-height: 24px;
   font-weight: 900;
   transform: translateY(-1px);
+}
+
+.mine-pill.mine-pill-pop {
+  animation: minePillPop 360ms cubic-bezier(0.18, 0.88, 0.25, 1.2) both;
 }
 
 .mode-switch {
@@ -311,6 +360,14 @@ button:focus-visible {
 
 .tool-button.selected {
   background: var(--green);
+}
+
+.mode-switch.mode-switch-pop {
+  animation: switchNudge 280ms ease-out both;
+}
+
+.tool-button.tool-pop svg {
+  animation: toolPop 280ms cubic-bezier(0.18, 0.9, 0.25, 1.22) both;
 }
 
 .tool-button svg {
@@ -357,6 +414,42 @@ button:focus-visible {
   font-weight: 900;
 }
 
+.reset-button.reset-spin svg {
+  animation: resetSpin 520ms cubic-bezier(0.2, 0.85, 0.24, 1) both;
+  transform-origin: center;
+}
+
+.hint-button.hint-pulse {
+  animation: hintPulse 620ms ease-out both;
+}
+
+.hint-button.hint-pulse svg {
+  animation: bulbWobble 620ms ease-out both;
+  transform-origin: center;
+}
+
+.hint-button.hint-empty {
+  animation: hintEmpty 330ms ease-in-out both;
+}
+
+.counter.counter-pop {
+  animation: counterPop 560ms cubic-bezier(0.18, 0.9, 0.25, 1.18) both;
+}
+
+.counter.counter-drop {
+  animation: counterDrop 460ms ease-out both;
+}
+
+.board.board-shake {
+  animation: boardShake 430ms ease-in-out both;
+}
+
+.board.board-win .cell.revealed,
+.board.board-win .cell.flagged {
+  animation: winBounce 560ms cubic-bezier(0.18, 0.9, 0.25, 1.22) both;
+  animation-delay: calc(var(--drop-delay) * 0.45);
+}
+
 @media (hover: hover) {
   .round-button:hover,
   .tool-button:hover,
@@ -376,4 +469,291 @@ button:focus-visible {
 .cell.hidden:active,
 .cell.flagged:active {
   filter: brightness(0.92);
+}
+
+@keyframes tileDropIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -38px, 0) scale(0.96);
+  }
+
+  68% {
+    opacity: 1;
+    transform: translate3d(0, 3px, 0) scale(1.01);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes tileFallAway {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+
+  35% {
+    opacity: 1;
+    transform: translate3d(0, 8px, 0) rotate(1deg) scale(0.98);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 45px, 0) rotate(8deg) scale(0.92);
+  }
+}
+
+@keyframes flagPlant {
+  0% {
+    opacity: 0;
+    transform: translate(-1px, -16px) rotate(-17deg) scale(0.72);
+  }
+
+  58% {
+    opacity: 1;
+    transform: translate(-1px, 3px) rotate(4deg) scale(1.08);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate(-1px, 1px) rotate(0deg) scale(1);
+  }
+}
+
+@keyframes flagFlyAway {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(15px, -21px, 0) rotate(28deg) scale(0.82);
+  }
+}
+
+@keyframes minePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.45) rotate(-14deg);
+  }
+
+  62% {
+    opacity: 1;
+    transform: scale(1.14) rotate(4deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes mineExplode {
+  0% {
+    transform: scale(1);
+    box-shadow: inset 0 0 0 1px var(--tile-edge), 0 0 0 0 rgba(255, 198, 62, 0.9);
+  }
+
+  45% {
+    transform: scale(1.18);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 0 0 13px rgba(255, 198, 62, 0.28);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08), 0 0 0 22px rgba(255, 198, 62, 0);
+  }
+}
+
+@keyframes minePillPop {
+  0% {
+    transform: scale(1);
+  }
+
+  48% {
+    transform: scale(1.11);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes switchNudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  45% {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes toolPop {
+  0% {
+    transform: scale(0.82) rotate(-8deg);
+  }
+
+  68% {
+    transform: scale(1.14) rotate(4deg);
+  }
+
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes resetSpin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  55% {
+    transform: rotate(290deg) scale(1.12);
+  }
+
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes hintPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12), 0 0 0 0 rgba(255, 198, 62, 0.7);
+  }
+
+  48% {
+    transform: scale(1.09);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12), 0 0 0 13px rgba(255, 198, 62, 0.18);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12), 0 0 0 22px rgba(255, 198, 62, 0);
+  }
+}
+
+@keyframes bulbWobble {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  30% {
+    transform: rotate(-9deg);
+  }
+
+  60% {
+    transform: rotate(8deg);
+  }
+}
+
+@keyframes hintEmpty {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  28% {
+    transform: translateX(-3px);
+  }
+
+  56% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes counterPop {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes counterDrop {
+  0% {
+    transform: translateY(0);
+  }
+
+  42% {
+    transform: translateY(4px);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes boardShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  18% {
+    transform: translateX(-5px);
+  }
+
+  36% {
+    transform: translateX(5px);
+  }
+
+  54% {
+    transform: translateX(-3px);
+  }
+
+  72% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes winBounce {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+
+  42% {
+    transform: translateY(-7px) scale(1.05);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board.board-drop .cell.hidden,
+  .board.board-drop .cell.flagged,
+  .cell.revealed-new::after,
+  .cell.flag-new svg,
+  .cell.flag-removed::after,
+  .cell.mine-reveal svg,
+  .cell.exploded,
+  .mine-pill.mine-pill-pop,
+  .mode-switch.mode-switch-pop,
+  .tool-button.tool-pop svg,
+  .reset-button.reset-spin svg,
+  .hint-button.hint-pulse,
+  .hint-button.hint-pulse svg,
+  .hint-button.hint-empty,
+  .counter.counter-pop,
+  .counter.counter-drop,
+  .board.board-shake,
+  .board.board-win .cell.revealed,
+  .board.board-win .cell.flagged {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
 }

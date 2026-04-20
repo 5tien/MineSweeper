@@ -9,23 +9,17 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Minesweeper</title>
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="icon" href="icons/icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="icons/maskable-192.png">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <div class="stage">
       <main class="phone" aria-label="Minesweeper game">
         <header class="topbar">
-          <button class="round-button back-button" type="button" aria-label="Restart preset" title="Restart preset">
-            <svg viewBox="0 0 40 40" aria-hidden="true">
-              <path d="M23.5 12.5 16 20l7.5 7.5" fill="none" stroke="currentColor" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-
           <div class="counter counter-current">
             <span>CURRENT STREAK</span>
-            <strong id="currentStreak">1</strong>
+            <strong id="currentStreak">0</strong>
           </div>
 
           <div class="crowned-counter">
@@ -34,7 +28,7 @@
             </svg>
             <div class="counter counter-all">
               <span>ALL TIME</span>
-              <strong id="allTime">8</strong>
+              <strong id="allTime">0</strong>
             </div>
           </div>
 
@@ -55,7 +49,7 @@
               <path d="M16 7.6a8.4 8.4 0 1 0 0 16.8 8.4 8.4 0 0 0 0-16.8z"/>
               <circle cx="20.4" cy="11.5" r="2.2" fill="#98aaba"/>
             </svg>
-            <strong id="mineCount">22</strong>
+            <strong id="mineCount">0</strong>
           </div>
 
           <div class="mode-switch" role="group" aria-label="Tool mode">
