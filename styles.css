@@ -13,6 +13,8 @@
   --two: #4fd169;
   --purple: #b06ad7;
   --yellow: #ffc63e;
+  --asset-soften: brightness(1.68) saturate(0.72) contrast(0.74);
+  --bomb-soften: brightness(2.05) saturate(0.58) contrast(0.62);
 }
 
 * {
@@ -265,17 +267,28 @@ button:focus-visible {
   color: var(--purple);
 }
 
-.cell.flagged svg,
-.cell.mine svg {
-  width: 32px;
-  height: 32px;
+.cell-flag-icon,
+.cell-bomb-icon {
+  width: 36px;
+  height: 36px;
 }
 
-.cell.flagged svg {
+.cell-flag-icon,
+.cell-bomb-icon {
+  object-fit: contain;
+  pointer-events: none;
+  filter: var(--asset-soften);
+}
+
+.cell-bomb-icon {
+  filter: var(--bomb-soften);
+}
+
+.cell-flag-icon {
   transform: translate(-1px, 1px);
 }
 
-.cell.flag-new svg {
+.cell.flag-new .cell-flag-icon {
   animation: flagPlant 360ms cubic-bezier(0.18, 0.9, 0.25, 1.22) both;
   transform-origin: 68% 82%;
 }
@@ -300,7 +313,7 @@ button:focus-visible {
   box-shadow: inset 0 0 0 1px var(--tile-edge);
 }
 
-.cell.mine-reveal svg {
+.cell.mine-reveal .cell-bomb-icon {
   animation: minePop 390ms cubic-bezier(0.18, 0.88, 0.25, 1.18) both;
   animation-delay: var(--mine-delay);
 }
@@ -319,14 +332,14 @@ button:focus-visible {
 }
 
 .mine-pill {
-  width: 86px;
+  width: 90px;
   height: 40px;
   position: absolute;
   left: 20px;
   top: 9px;
   display: grid;
-  grid-template-columns: 31px minmax(38px, 1fr);
-  column-gap: 3px;
+  grid-template-columns: 35px minmax(38px, 1fr);
+  column-gap: 2px;
   align-items: center;
   border-radius: 18px;
   background: var(--soft);
@@ -335,10 +348,13 @@ button:focus-visible {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 1px 1px rgba(0, 0, 0, 0.13);
 }
 
-.mine-pill svg {
-  width: 27px;
-  height: 27px;
+.bomb-icon {
+  width: 34px;
+  height: 34px;
   justify-self: center;
+  object-fit: contain;
+  pointer-events: none;
+  filter: var(--bomb-soften);
 }
 
 .mine-pill strong {
@@ -405,13 +421,32 @@ button:focus-visible {
   animation: switchNudge 280ms ease-out both;
 }
 
-.tool-button.tool-pop svg {
+.tool-button.tool-pop svg,
+.tool-button.tool-pop img {
   animation: toolPop 280ms cubic-bezier(0.18, 0.9, 0.25, 1.22) both;
 }
 
 .tool-button svg {
   width: 46px;
   height: 46px;
+}
+
+.tool-button .shovel-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  pointer-events: none;
+  filter: var(--asset-soften);
+  transform: translate(0, 1px);
+}
+
+.tool-button .flag-tool-icon {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  pointer-events: none;
+  filter: var(--asset-soften);
+  transform: translate(1px, 0);
 }
 
 .hint-button {
@@ -779,9 +814,9 @@ button:focus-visible {
   .board.board-drop .cell.hidden,
   .board.board-drop .cell.flagged,
   .cell.revealed-new::after,
-  .cell.flag-new svg,
+  .cell.flag-new .cell-flag-icon,
   .cell.flag-removed::after,
-  .cell.mine-reveal svg,
+  .cell.mine-reveal .cell-bomb-icon,
   .cell.exploded,
   .mine-pill.mine-pill-pop,
   .mode-switch.mode-switch-pop,

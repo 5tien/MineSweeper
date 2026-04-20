@@ -4,6 +4,7 @@ const MIN_MINES = 16;
 const MAX_MINES = 28;
 const DESIGN_WIDTH = 375;
 const MAX_SCALE = 1.16;
+const TAP_MOVE_LIMIT = 12;
 
 const boardEl = document.querySelector("#board");
 const mineCountEl = document.querySelector("#mineCount");
@@ -28,6 +29,7 @@ let gameOver = false;
 let hasFirstMove = false;
 let suppressNextClick = false;
 let suppressClickCell = null;
+let suppressAnyClick = false;
 let revealAnimationCells = new Set();
 let revealAnimationOrigin = null;
 let revealAnimationTimer = 0;
@@ -38,6 +40,7 @@ let flagAnimationCells = new Set();
 let unflagAnimationCells = new Set();
 let flagAnimationTimer = 0;
 let suppressClickTimer = 0;
+let touchPress = null;
 
 function setAppScale() {
   const viewport = window.visualViewport;
@@ -119,20 +122,13 @@ function countAdjacentMines(row, col) {
 
 function makeFlagSvg() {
   return `
-    <svg viewBox="0 0 34 34" aria-hidden="true">
-      <path d="M22 5.5v23" fill="none" stroke="#333b43" stroke-width="3.6" stroke-linecap="round"/>
-      <path d="M20.7 8.6 7.2 15.5l13.5 6.6z" fill="#f65d57"/>
-    </svg>
+    <img class="cell-flag-icon" src="assets/flag.png" alt="" aria-hidden="true">
   `;
 }
 
 function makeMineSvg() {
   return `
-    <svg viewBox="0 0 34 34" aria-hidden="true">
-      <path d="M17 6.7v-4M17 31.3v-4M6.7 17h-4M31.3 17h-4M10 10 7.1 7.1M26.9 26.9 24 24M24 10l2.9-2.9M7.1 26.9 10 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-      <circle cx="17" cy="17" r="8.8" fill="currentColor"/>
-      <circle cx="21" cy="12.5" r="2.2" fill="#f7f7f8"/>
-    </svg>
+    <img class="cell-bomb-icon" src="assets/bomb.png" alt="" aria-hidden="true">
   `;
 }
 
@@ -162,14 +158,21 @@ function replayElementAnimation(element, className, duration = 520) {
   }, duration);
 }
 
-function suppressSyntheticClick(id) {
+function suppressSyntheticClick(id, options = {}) {
   window.clearTimeout(suppressClickTimer);
   suppressNextClick = true;
   suppressClickCell = id;
+  suppressAnyClick = Boolean(options.any);
   suppressClickTimer = window.setTimeout(() => {
     suppressNextClick = false;
     suppressClickCell = null;
-  }, 700);
+    suppressAnyClick = false;
+  }, options.duration || 700);
+}
+
+function clearPressTimer() {
+  if (pressTimer) window.clearTimeout(pressTimer);
+  pressTimer = 0;
 }
 
 function renderBoard() {
@@ -440,10 +443,11 @@ boardEl.addEventListener("click", (event) => {
   const id = key(row, col);
 
   if (suppressNextClick) {
-    const shouldSuppress = suppressClickCell === id;
+    const shouldSuppress = suppressAnyClick || suppressClickCell === id;
     window.clearTimeout(suppressClickTimer);
     suppressNextClick = false;
     suppressClickCell = null;
+    suppressAnyClick = false;
     if (shouldSuppress) return;
   }
 
@@ -467,6 +471,13 @@ boardEl.addEventListener("pointerdown", (event) => {
   if (!cell || event.pointerType === "mouse") return;
   const row = Number(cell.dataset.row);
   const col = Number(cell.dataset.col);
+  touchPress = {
+    cellId: key(row, col),
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    moved: false,
+  };
   pressTimer = window.setTimeout(() => {
     toggleFlag(row, col);
     suppressSyntheticClick(key(row, col));
@@ -474,19 +485,39 @@ boardEl.addEventListener("pointerdown", (event) => {
   }, 420);
 });
 
-boardEl.addEventListener("pointerup", () => {
-  if (pressTimer) window.clearTimeout(pressTimer);
-  pressTimer = 0;
+boardEl.addEventListener("pointermove", (event) => {
+  if (!touchPress || touchPress.pointerId !== event.pointerId) return;
+  const deltaX = event.clientX - touchPress.startX;
+  const deltaY = event.clientY - touchPress.startY;
+
+  if (Math.hypot(deltaX, deltaY) > TAP_MOVE_LIMIT) {
+    touchPress.moved = true;
+    clearPressTimer();
+  }
+});
+
+boardEl.addEventListener("pointerup", (event) => {
+  clearPressTimer();
+  if (touchPress && touchPress.pointerId === event.pointerId && touchPress.moved) {
+    suppressSyntheticClick(touchPress.cellId, { any: true, duration: 350 });
+  }
+  touchPress = null;
 });
 
 boardEl.addEventListener("pointerleave", () => {
-  if (pressTimer) window.clearTimeout(pressTimer);
-  pressTimer = 0;
+  clearPressTimer();
+  if (touchPress) {
+    suppressSyntheticClick(touchPress.cellId, { any: true, duration: 350 });
+    touchPress = null;
+  }
 });
 
 boardEl.addEventListener("pointercancel", () => {
-  if (pressTimer) window.clearTimeout(pressTimer);
-  pressTimer = 0;
+  clearPressTimer();
+  if (touchPress) {
+    suppressSyntheticClick(touchPress.cellId, { any: true, duration: 350 });
+    touchPress = null;
+  }
 });
 
 digModeButton.addEventListener("click", () => {
