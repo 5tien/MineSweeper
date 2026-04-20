@@ -178,7 +178,9 @@ function renderSettingsControls() {
   rowsUpButton.disabled = pendingSettings.rows >= MAX_ROWS;
 
   for (const button of difficultyButtons) {
-    button.classList.toggle("selected", button.dataset.difficulty === pendingSettings.difficulty);
+    const isSelected = button.dataset.difficulty === pendingSettings.difficulty;
+    button.classList.toggle("selected", isSelected);
+    button.setAttribute("aria-pressed", isSelected ? "true" : "false");
   }
 }
 
