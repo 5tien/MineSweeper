@@ -1,4 +1,4 @@
-const CACHE_NAME = "minesweeper-pwa-v33";
+const CACHE_NAME = "minesweeper-pwa-v36";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -6,8 +6,8 @@ const APP_SHELL = [
   "./app.js",
   "./manifest.webmanifest",
   "./assets/bomb.png",
+  "./assets/settings-cog.svg",
   "./assets/shovel.png",
-  "./assets/flag.png",
   "./assets/flag-red.png",
   "./icons/logo-source.png",
   "./icons/icon-192.png",

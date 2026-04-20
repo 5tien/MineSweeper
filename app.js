@@ -16,6 +16,7 @@ const DIFFICULTIES = Object.freeze({
   easy: { minDensity: 0.1, maxDensity: 0.14 },
   normal: { minDensity: 0.16, maxDensity: 0.2 },
   hard: { minDensity: 0.22, maxDensity: 0.26 },
+  extreme: { minDensity: 0.3, maxDensity: 0.34 },
 });
 
 const boardEl = document.querySelector("#board");
@@ -29,6 +30,7 @@ const settingsButton = document.querySelector(".settings-button");
 const settingsPanel = document.querySelector("#settingsPanel");
 const settingsCloseButton = document.querySelector("#settingsClose");
 const settingsApplyButton = document.querySelector("#settingsApply");
+const settingsClassicButton = document.querySelector("#settingsClassic");
 const colsDownButton = document.querySelector("#colsDown");
 const colsUpButton = document.querySelector("#colsUp");
 const rowsDownButton = document.querySelector("#rowsDown");
@@ -67,6 +69,7 @@ let flagAnimationCells = new Set();
 let unflagAnimationCells = new Set();
 let flagAnimationTimer = 0;
 let suppressClickTimer = 0;
+let settingsCloseTimer = 0;
 let touchPress = null;
 
 function setAppScale() {
@@ -187,15 +190,34 @@ function changePendingSetting(name, delta) {
   renderSettingsControls();
 }
 
+function setPendingClassicSettings() {
+  pendingSettings = {
+    rows: DEFAULT_ROWS,
+    cols: DEFAULT_COLS,
+    difficulty: "normal",
+  };
+  renderSettingsControls();
+  replayElementAnimation(settingsClassicButton, "settings-control-pop", 260);
+}
+
 function openSettings() {
+  window.clearTimeout(settingsCloseTimer);
   pendingSettings = { ...settings };
   renderSettingsControls();
   settingsPanel.hidden = false;
+  settingsPanel.classList.remove("settings-closing");
   replayElementAnimation(settingsButton, "settings-pop", 390);
 }
 
 function closeSettings() {
-  settingsPanel.hidden = true;
+  if (settingsPanel.hidden || settingsPanel.classList.contains("settings-closing")) return;
+
+  window.clearTimeout(settingsCloseTimer);
+  settingsPanel.classList.add("settings-closing");
+  settingsCloseTimer = window.setTimeout(() => {
+    settingsPanel.hidden = true;
+    settingsPanel.classList.remove("settings-closing");
+  }, 170);
 }
 
 function applySettings() {
@@ -208,6 +230,7 @@ function applySettings() {
   cols = settings.cols;
   saveSettings();
   closeSettings();
+  replayElementAnimation(settingsApplyButton, "settings-control-pop", 260);
 
   if (didChange) {
     loadRandomBoard();
@@ -375,7 +398,9 @@ function renderBoard() {
   }
 
   boardEl.innerHTML = cells.join("");
-  mineCountEl.textContent = Math.max(0, mineTotal - flags.size);
+  const remainingMines = Math.max(0, mineTotal - flags.size);
+  mineCountEl.textContent = remainingMines;
+  minePillEl.dataset.digits = String(remainingMines).length;
 }
 
 function triggerBoardDrop() {
@@ -473,6 +498,7 @@ function revealCell(row, col) {
     const button = boardEl.querySelector(`[data-row="${row}"][data-col="${col}"]`);
     if (button) button.classList.add("exploded");
     triggerBoardShake();
+    replayElementAnimation(minePillEl, "mine-pill-danger", 680);
     replayElementAnimation(currentStreakEl.parentElement, "counter-drop", 520);
     return;
   }
@@ -682,7 +708,7 @@ resetButton.addEventListener("click", () => {
 });
 
 settingsButton.addEventListener("click", () => {
-  if (settingsPanel.hidden) {
+  if (settingsPanel.hidden || settingsPanel.classList.contains("settings-closing")) {
     openSettings();
   } else {
     closeSettings();
@@ -699,6 +725,7 @@ colsDownButton.addEventListener("click", () => changePendingSetting("cols", -1))
 colsUpButton.addEventListener("click", () => changePendingSetting("cols", 1));
 rowsDownButton.addEventListener("click", () => changePendingSetting("rows", -1));
 rowsUpButton.addEventListener("click", () => changePendingSetting("rows", 1));
+settingsClassicButton.addEventListener("click", setPendingClassicSettings);
 
 for (const button of difficultyButtons) {
   button.addEventListener("click", () => {
@@ -706,6 +733,7 @@ for (const button of difficultyButtons) {
       ? button.dataset.difficulty
       : "normal";
     renderSettingsControls();
+    replayElementAnimation(button, "settings-control-pop", 260);
   });
 }
 

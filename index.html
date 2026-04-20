@@ -18,12 +18,7 @@
       <main class="phone" aria-label="Minesweeper game">
         <header class="topbar">
           <button class="round-button settings-button" type="button" aria-label="Settings" title="Settings">
-            <svg viewBox="0 0 48 48" aria-hidden="true">
-              <g transform="translate(0 -2.8)">
-                <path d="M20.4 5.8h7.2l1.1 5.2c1.1.3 2.1.8 3.1 1.3l4.5-2.9 5.1 5.1-2.9 4.5c.6 1 1 2 1.3 3.1l5.2 1.1v7.2l-5.2 1.1c-.3 1.1-.8 2.1-1.3 3.1l2.9 4.5-5.1 5.1-4.5-2.9c-1 .6-2 1-3.1 1.3l-1.1 5.2h-7.2l-1.1-5.2c-1.1-.3-2.1-.8-3.1-1.3l-4.5 2.9-5.1-5.1 2.9-4.5c-.6-1-1-2-1.3-3.1L3 30.4v-7.2l5.2-1.1c.3-1.1.8-2.1 1.3-3.1l-2.9-4.5 5.1-5.1 4.5 2.9c1-.6 2-1 3.1-1.3z" fill="none" stroke="currentColor" stroke-width="3.7" stroke-linejoin="round"/>
-                <circle cx="24" cy="26.8" r="6.7" fill="none" stroke="currentColor" stroke-width="3.7"/>
-              </g>
-            </svg>
+            <img class="settings-icon" src="assets/settings-cog.svg" alt="" aria-hidden="true">
           </button>
 
           <div class="counter counter-current">
@@ -108,9 +103,13 @@
               <button type="button" data-difficulty="easy">EASY</button>
               <button type="button" data-difficulty="normal">NORMAL</button>
               <button type="button" data-difficulty="hard">HARD</button>
+              <button type="button" data-difficulty="extreme">EXTREME</button>
             </div>
 
-            <button id="settingsApply" class="settings-apply" type="button">APPLY</button>
+            <div class="settings-actions">
+              <button id="settingsClassic" class="settings-classic" type="button">CLASSIC</button>
+              <button id="settingsApply" class="settings-apply" type="button">APPLY</button>
+            </div>
           </section>
         </div>
       </main>
