@@ -73,6 +73,7 @@ button:focus-visible {
   width: 375px;
   height: 768px;
   min-height: 768px;
+  position: relative;
   background: var(--bg);
   padding-top: 36px;
   transform: scale(var(--app-scale));
@@ -110,8 +111,12 @@ button:focus-visible {
   height: 35px;
 }
 
+.settings-button {
+  left: 8px;
+}
+
 .reset-button {
-  right: 24px;
+  right: 14px;
 }
 
 .counter {
@@ -156,12 +161,12 @@ button:focus-visible {
 }
 
 .counter-current {
-  left: 43px;
+  left: 66px;
 }
 
 .crowned-counter {
   position: absolute;
-  left: 163px;
+  left: 182px;
   top: 0;
   width: 106px;
   height: 56px;
@@ -186,25 +191,35 @@ button:focus-visible {
 }
 
 .board {
+  --cols: 9;
+  --rows: 14;
+  --cell-size: 34px;
+  --cell-gap: 4px;
+  --cell-font-size: 30px;
+  --cell-icon-size: 36px;
+  --cell-flag-size: 24px;
   width: 338px;
+  height: 528px;
   margin: 7px auto 0;
   display: grid;
-  grid-template-columns: repeat(9, 34px);
-  grid-auto-rows: 34px;
-  gap: 4px;
+  grid-template-columns: repeat(var(--cols), var(--cell-size));
+  grid-template-rows: repeat(var(--rows), var(--cell-size));
+  justify-content: center;
+  align-content: center;
+  gap: var(--cell-gap);
 }
 
 .cell {
-  width: 34px;
-  height: 34px;
+  width: var(--cell-size);
+  height: var(--cell-size);
   border: 0;
   border-radius: 4px;
   background: transparent;
   display: grid;
   place-items: center;
   padding: 0;
-  font-size: 30px;
-  line-height: 34px;
+  font-size: var(--cell-font-size);
+  line-height: var(--cell-size);
   font-family: "Arial Black", "Arial Rounded MT Bold", "Trebuchet MS", Arial, sans-serif;
   font-weight: 1000;
   cursor: pointer;
@@ -269,8 +284,13 @@ button:focus-visible {
 
 .cell-flag-icon,
 .cell-bomb-icon {
-  width: 36px;
-  height: 36px;
+  width: var(--cell-icon-size);
+  height: var(--cell-icon-size);
+}
+
+.cell-flag-icon {
+  width: var(--cell-flag-size);
+  height: var(--cell-flag-size);
 }
 
 .cell-flag-icon,
@@ -285,26 +305,18 @@ button:focus-visible {
 }
 
 .cell-flag-icon {
-  transform: translate(-1px, 1px);
+  filter: none;
+  transform: translate(0, 1px);
 }
 
 .cell.flag-new .cell-flag-icon {
-  animation: flagPlant 360ms cubic-bezier(0.18, 0.9, 0.25, 1.22) both;
-  transform-origin: 68% 82%;
+  animation: flagPlant 300ms cubic-bezier(0.18, 0.9, 0.25, 1.14) both;
+  transform-origin: 52% 86%;
 }
 
-.cell.flag-removed::after {
-  content: "";
-  width: 16px;
-  height: 14px;
-  position: absolute;
-  left: 8px;
-  top: 8px;
-  border-radius: 1px;
-  pointer-events: none;
-  background: var(--red);
-  clip-path: polygon(100% 0, 0 50%, 100% 100%);
-  animation: flagFlyAway 340ms ease-out both;
+.cell.flag-removed .cell-flag-icon {
+  animation: flagPull 240ms cubic-bezier(0.42, 0, 0.7, 0.2) both;
+  transform-origin: 52% 86%;
 }
 
 .cell.mine {
@@ -441,12 +453,12 @@ button:focus-visible {
 }
 
 .tool-button .flag-tool-icon {
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
   object-fit: contain;
   pointer-events: none;
-  filter: var(--asset-soften);
-  transform: translate(1px, 0);
+  filter: none;
+  transform: translate(0, 0);
 }
 
 .hint-button {
@@ -489,6 +501,183 @@ button:focus-visible {
   font-weight: 1000;
   -webkit-text-stroke: 0.25px currentColor;
   paint-order: stroke fill;
+}
+
+.settings-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  padding-top: 92px;
+  background: rgba(32, 41, 50, 0.42);
+  backdrop-filter: blur(2px);
+}
+
+.settings-overlay[hidden] {
+  display: none;
+}
+
+.settings-menu {
+  width: 310px;
+  border-radius: 7px;
+  background: var(--panel);
+  padding: 13px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 12px 28px rgba(0, 0, 0, 0.28);
+  animation: settingsMenuIn 220ms cubic-bezier(0.18, 0.88, 0.25, 1.08) both;
+}
+
+.settings-head {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.settings-head h2 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 17px;
+  font-weight: 1000;
+  color: var(--green);
+  -webkit-text-stroke: 0.35px currentColor;
+  paint-order: stroke fill;
+}
+
+.settings-close {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--tile);
+  color: var(--pink);
+  padding: 0;
+  cursor: pointer;
+}
+
+.settings-close svg {
+  width: 25px;
+  height: 25px;
+}
+
+.settings-row {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-row span {
+  font-size: 11px;
+  line-height: 12px;
+  font-weight: 1000;
+  color: white;
+  -webkit-text-stroke: 0.25px currentColor;
+  paint-order: stroke fill;
+}
+
+.stepper {
+  width: 142px;
+  height: 39px;
+  display: grid;
+  grid-template-columns: 42px 58px 42px;
+  overflow: hidden;
+  border: 4px solid #222c35;
+  border-radius: 6px;
+  background: #879bab;
+}
+
+.stepper button {
+  border: 0;
+  background: #879bab;
+  color: #222c35;
+  padding: 0;
+  font-size: 26px;
+  line-height: 31px;
+  font-weight: 1000;
+  cursor: pointer;
+  -webkit-text-stroke: 0.35px currentColor;
+  paint-order: stroke fill;
+}
+
+.stepper button:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.stepper strong {
+  display: grid;
+  place-items: center;
+  border-left: 4px solid #222c35;
+  border-right: 4px solid #222c35;
+  background: var(--tile);
+  color: #222c35;
+  font-size: 22px;
+  line-height: 22px;
+  font-weight: 1000;
+  -webkit-text-stroke: 0.45px currentColor;
+  paint-order: stroke fill;
+}
+
+.difficulty-options {
+  height: 48px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  overflow: hidden;
+  margin-top: 10px;
+  border: 5px solid #222c35;
+  border-radius: 6px;
+  background: #879bab;
+}
+
+.difficulty-options button {
+  border: 0;
+  background: #879bab;
+  color: #222c35;
+  padding: 0;
+  font-size: 11px;
+  line-height: 12px;
+  font-weight: 1000;
+  cursor: pointer;
+  -webkit-text-stroke: 0.25px currentColor;
+  paint-order: stroke fill;
+}
+
+.difficulty-options button + button {
+  border-left: 5px solid #222c35;
+}
+
+.difficulty-options button.selected {
+  background: var(--green);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.15);
+}
+
+.settings-apply {
+  width: 100%;
+  height: 43px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--green);
+  color: #202932;
+  font-size: 17px;
+  line-height: 18px;
+  font-weight: 1000;
+  cursor: pointer;
+  -webkit-text-stroke: 0.45px currentColor;
+  paint-order: stroke fill;
+}
+
+.settings-button.settings-pop svg {
+  animation: settingsTwist 360ms cubic-bezier(0.18, 0.88, 0.25, 1.18) both;
+  transform-origin: center;
 }
 
 .reset-button.reset-spin svg {
@@ -585,29 +774,34 @@ button:focus-visible {
 @keyframes flagPlant {
   0% {
     opacity: 0;
-    transform: translate(-1px, -16px) rotate(-17deg) scale(0.72);
+    transform: translate3d(0, -12px, 0) scale(0.72);
   }
 
-  58% {
+  68% {
     opacity: 1;
-    transform: translate(-1px, 3px) rotate(4deg) scale(1.08);
+    transform: translate3d(0, 2px, 0) scale(1.08);
   }
 
   100% {
     opacity: 1;
-    transform: translate(-1px, 1px) rotate(0deg) scale(1);
+    transform: translate3d(0, 1px, 0) scale(1);
   }
 }
 
-@keyframes flagFlyAway {
+@keyframes flagPull {
   0% {
     opacity: 1;
-    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+    transform: translate3d(0, 1px, 0) scale(1);
+  }
+
+  35% {
+    opacity: 1;
+    transform: translate3d(0, -3px, 0) scale(0.94);
   }
 
   100% {
     opacity: 0;
-    transform: translate3d(15px, -21px, 0) rotate(28deg) scale(0.82);
+    transform: translate3d(0, -14px, 0) scale(0.76);
   }
 }
 
@@ -695,6 +889,32 @@ button:focus-visible {
 
   100% {
     transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes settingsMenuIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.97);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes settingsTwist {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  58% {
+    transform: rotate(82deg) scale(1.1);
+  }
+
+  100% {
+    transform: rotate(72deg) scale(1);
   }
 }
 
@@ -815,7 +1035,7 @@ button:focus-visible {
   .board.board-drop .cell.flagged,
   .cell.revealed-new::after,
   .cell.flag-new .cell-flag-icon,
-  .cell.flag-removed::after,
+  .cell.flag-removed .cell-flag-icon,
   .cell.mine-reveal .cell-bomb-icon,
   .cell.exploded,
   .mine-pill.mine-pill-pop,
@@ -825,6 +1045,8 @@ button:focus-visible {
   .hint-button.hint-pulse,
   .hint-button.hint-pulse svg,
   .hint-button.hint-empty,
+  .settings-menu,
+  .settings-button.settings-pop svg,
   .counter.counter-pop,
   .counter.counter-drop,
   .board.board-shake,

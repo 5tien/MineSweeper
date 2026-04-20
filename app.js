@@ -1,10 +1,22 @@
-const ROWS = 14;
-const COLS = 9;
-const MIN_MINES = 16;
-const MAX_MINES = 28;
+const DEFAULT_ROWS = 14;
+const DEFAULT_COLS = 9;
+const MIN_ROWS = 8;
+const MAX_ROWS = 18;
+const MIN_COLS = 6;
+const MAX_COLS = 12;
+const BOARD_WIDTH = 338;
+const BOARD_HEIGHT = 528;
+const CELL_GAP = 4;
+const MIN_CELL_SIZE = 22;
+const MAX_CELL_SIZE = 42;
 const DESIGN_WIDTH = 375;
 const MAX_SCALE = 1.16;
 const TAP_MOVE_LIMIT = 12;
+const DIFFICULTIES = Object.freeze({
+  easy: { minDensity: 0.1, maxDensity: 0.14 },
+  normal: { minDensity: 0.16, maxDensity: 0.2 },
+  hard: { minDensity: 0.22, maxDensity: 0.26 },
+});
 
 const boardEl = document.querySelector("#board");
 const mineCountEl = document.querySelector("#mineCount");
@@ -12,13 +24,28 @@ const currentStreakEl = document.querySelector("#currentStreak");
 const allTimeEl = document.querySelector("#allTime");
 const digModeButton = document.querySelector("#digMode");
 const flagModeButton = document.querySelector("#flagMode");
-const modeSwitchEl = document.querySelector(".mode-switch");
 const resetButton = document.querySelector(".reset-button");
+const settingsButton = document.querySelector(".settings-button");
+const settingsPanel = document.querySelector("#settingsPanel");
+const settingsCloseButton = document.querySelector("#settingsClose");
+const settingsApplyButton = document.querySelector("#settingsApply");
+const colsDownButton = document.querySelector("#colsDown");
+const colsUpButton = document.querySelector("#colsUp");
+const rowsDownButton = document.querySelector("#rowsDown");
+const rowsUpButton = document.querySelector("#rowsUp");
+const colsValueEl = document.querySelector("#colsValue");
+const rowsValueEl = document.querySelector("#rowsValue");
+const difficultyButtons = [...document.querySelectorAll("[data-difficulty]")];
 const hintButton = document.querySelector(".hint-button");
 const minePillEl = document.querySelector(".mine-pill");
 
 const storageKey = "minesweeper-scores-v2";
+const settingsStorageKey = "minesweeper-settings-v1";
 const savedScores = readSavedScores();
+let settings = readSavedSettings();
+let pendingSettings = { ...settings };
+let rows = settings.rows;
+let cols = settings.cols;
 let scores = savedScores || { current: 0, best: 0 };
 let mineTotal = chooseMineTotal();
 let mode = "flag";
@@ -97,6 +124,96 @@ function readSavedScores() {
   }
 }
 
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function readSavedSettings() {
+  try {
+    const value = localStorage.getItem(settingsStorageKey);
+    if (!value) {
+      return {
+        rows: DEFAULT_ROWS,
+        cols: DEFAULT_COLS,
+        difficulty: "normal",
+      };
+    }
+
+    const parsed = JSON.parse(value);
+    const savedRows = Number.isFinite(parsed.rows) ? Math.floor(parsed.rows) : DEFAULT_ROWS;
+    const savedCols = Number.isFinite(parsed.cols) ? Math.floor(parsed.cols) : DEFAULT_COLS;
+    const savedDifficulty = DIFFICULTIES[parsed.difficulty] ? parsed.difficulty : "normal";
+
+    return {
+      rows: clamp(savedRows, MIN_ROWS, MAX_ROWS),
+      cols: clamp(savedCols, MIN_COLS, MAX_COLS),
+      difficulty: savedDifficulty,
+    };
+  } catch {
+    return {
+      rows: DEFAULT_ROWS,
+      cols: DEFAULT_COLS,
+      difficulty: "normal",
+    };
+  }
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(settingsStorageKey, JSON.stringify(settings));
+  } catch {
+    // Private browsing modes can make localStorage unavailable.
+  }
+}
+
+function renderSettingsControls() {
+  colsValueEl.textContent = pendingSettings.cols;
+  rowsValueEl.textContent = pendingSettings.rows;
+  colsDownButton.disabled = pendingSettings.cols <= MIN_COLS;
+  colsUpButton.disabled = pendingSettings.cols >= MAX_COLS;
+  rowsDownButton.disabled = pendingSettings.rows <= MIN_ROWS;
+  rowsUpButton.disabled = pendingSettings.rows >= MAX_ROWS;
+
+  for (const button of difficultyButtons) {
+    button.classList.toggle("selected", button.dataset.difficulty === pendingSettings.difficulty);
+  }
+}
+
+function changePendingSetting(name, delta) {
+  const limits = name === "cols"
+    ? [MIN_COLS, MAX_COLS]
+    : [MIN_ROWS, MAX_ROWS];
+  pendingSettings[name] = clamp(pendingSettings[name] + delta, limits[0], limits[1]);
+  renderSettingsControls();
+}
+
+function openSettings() {
+  pendingSettings = { ...settings };
+  renderSettingsControls();
+  settingsPanel.hidden = false;
+  replayElementAnimation(settingsButton, "settings-pop", 390);
+}
+
+function closeSettings() {
+  settingsPanel.hidden = true;
+}
+
+function applySettings() {
+  const didChange = pendingSettings.rows !== settings.rows
+    || pendingSettings.cols !== settings.cols
+    || pendingSettings.difficulty !== settings.difficulty;
+
+  settings = { ...pendingSettings };
+  rows = settings.rows;
+  cols = settings.cols;
+  saveSettings();
+  closeSettings();
+
+  if (didChange) {
+    loadRandomBoard();
+  }
+}
+
 function key(row, col) {
   return `${row},${col}`;
 }
@@ -108,7 +225,7 @@ function neighbors(row, col) {
       if (rowOffset === 0 && colOffset === 0) continue;
       const nextRow = row + rowOffset;
       const nextCol = col + colOffset;
-      if (nextRow >= 0 && nextRow < ROWS && nextCol >= 0 && nextCol < COLS) {
+      if (nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols) {
         cells.push([nextRow, nextCol]);
       }
     }
@@ -122,7 +239,7 @@ function countAdjacentMines(row, col) {
 
 function makeFlagSvg() {
   return `
-    <img class="cell-flag-icon" src="assets/flag.png" alt="" aria-hidden="true">
+    <img class="cell-flag-icon" src="assets/flag-red.png" alt="" aria-hidden="true">
   `;
 }
 
@@ -175,11 +292,29 @@ function clearPressTimer() {
   pressTimer = 0;
 }
 
+function updateBoardSizing() {
+  const widthCell = Math.floor((BOARD_WIDTH - (cols - 1) * CELL_GAP) / cols);
+  const heightCell = Math.floor((BOARD_HEIGHT - (rows - 1) * CELL_GAP) / rows);
+  const cellSize = clamp(Math.min(widthCell, heightCell, MAX_CELL_SIZE), MIN_CELL_SIZE, MAX_CELL_SIZE);
+  const fontSize = clamp(Math.round(cellSize * 0.86), 18, 30);
+  const iconSize = clamp(Math.round(cellSize * 1.04), 22, 38);
+  const flagSize = clamp(Math.round(cellSize * 0.62), 14, 24);
+
+  boardEl.style.setProperty("--cols", cols);
+  boardEl.style.setProperty("--rows", rows);
+  boardEl.style.setProperty("--cell-size", `${cellSize}px`);
+  boardEl.style.setProperty("--cell-gap", `${CELL_GAP}px`);
+  boardEl.style.setProperty("--cell-font-size", `${fontSize}px`);
+  boardEl.style.setProperty("--cell-icon-size", `${iconSize}px`);
+  boardEl.style.setProperty("--cell-flag-size", `${flagSize}px`);
+}
+
 function renderBoard() {
+  updateBoardSizing();
   const cells = [];
 
-  for (let row = 0; row < ROWS; row += 1) {
-    for (let col = 0; col < COLS; col += 1) {
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
       const id = key(row, col);
       const isRevealed = revealed.has(id);
       const isFlagged = flags.has(id);
@@ -219,7 +354,10 @@ function renderBoard() {
         label += ", mine";
       } else {
         className += " hidden";
-        if (unflagAnimationCells.has(id)) className += " flag-removed";
+        if (unflagAnimationCells.has(id)) {
+          className += " flag-removed";
+          content = makeFlagSvg();
+        }
       }
 
       cells.push(`
@@ -369,7 +507,7 @@ function toggleFlag(row, col) {
 }
 
 function checkWin() {
-  const safeCells = ROWS * COLS - mineTotal;
+  const safeCells = rows * cols - mineTotal;
   if (revealed.size !== safeCells) return;
 
   gameOver = true;
@@ -387,7 +525,13 @@ function randomInt(min, max) {
 }
 
 function chooseMineTotal() {
-  return randomInt(MIN_MINES, MAX_MINES);
+  const cellCount = rows * cols;
+  const difficulty = DIFFICULTIES[settings.difficulty] || DIFFICULTIES.normal;
+  const maxAllowed = Math.max(1, cellCount - 10);
+  const min = Math.min(maxAllowed, Math.max(1, Math.round(cellCount * difficulty.minDensity)));
+  const max = Math.min(maxAllowed, Math.max(min, Math.round(cellCount * difficulty.maxDensity)));
+
+  return randomInt(min, max);
 }
 
 function shuffled(values) {
@@ -406,8 +550,8 @@ function placeMinesAroundOpening(openingRow, openingCol) {
   ]);
   const allCells = [];
 
-  for (let row = 0; row < ROWS; row += 1) {
-    for (let col = 0; col < COLS; col += 1) {
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
       const id = key(row, col);
       if (!reserved.has(id)) allCells.push(id);
     }
@@ -524,14 +668,12 @@ digModeButton.addEventListener("click", () => {
   mode = "dig";
   renderMode();
   replayElementAnimation(digModeButton, "tool-pop", 330);
-  replayElementAnimation(modeSwitchEl, "mode-switch-pop", 330);
 });
 
 flagModeButton.addEventListener("click", () => {
   mode = "flag";
   renderMode();
   replayElementAnimation(flagModeButton, "tool-pop", 330);
-  replayElementAnimation(modeSwitchEl, "mode-switch-pop", 330);
 });
 
 resetButton.addEventListener("click", () => {
@@ -539,12 +681,42 @@ resetButton.addEventListener("click", () => {
   loadRandomBoard();
 });
 
+settingsButton.addEventListener("click", () => {
+  if (settingsPanel.hidden) {
+    openSettings();
+  } else {
+    closeSettings();
+  }
+});
+
+settingsCloseButton.addEventListener("click", closeSettings);
+
+settingsPanel.addEventListener("click", (event) => {
+  if (event.target === settingsPanel) closeSettings();
+});
+
+colsDownButton.addEventListener("click", () => changePendingSetting("cols", -1));
+colsUpButton.addEventListener("click", () => changePendingSetting("cols", 1));
+rowsDownButton.addEventListener("click", () => changePendingSetting("rows", -1));
+rowsUpButton.addEventListener("click", () => changePendingSetting("rows", 1));
+
+for (const button of difficultyButtons) {
+  button.addEventListener("click", () => {
+    pendingSettings.difficulty = DIFFICULTIES[button.dataset.difficulty]
+      ? button.dataset.difficulty
+      : "normal";
+    renderSettingsControls();
+  });
+}
+
+settingsApplyButton.addEventListener("click", applySettings);
+
 hintButton.addEventListener("click", () => {
   if (gameOver) return;
   replayElementAnimation(hintButton, "hint-pulse", 650);
   const safeHidden = [];
-  for (let row = 0; row < ROWS; row += 1) {
-    for (let col = 0; col < COLS; col += 1) {
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
       const id = key(row, col);
       if (!revealed.has(id) && !flags.has(id) && !mines.has(id)) {
         safeHidden.push([row, col]);
@@ -556,8 +728,13 @@ hintButton.addEventListener("click", () => {
   if (!pick) replayElementAnimation(hintButton, "hint-empty", 360);
 });
 
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !settingsPanel.hidden) closeSettings();
+});
+
 renderScores();
 renderMode();
+renderSettingsControls();
 setAppScale();
 loadRandomBoard();
 lockPageZoom();
