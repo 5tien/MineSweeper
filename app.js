@@ -1,6 +1,8 @@
 const ROWS = 14;
 const COLS = 9;
 const MINES = 22;
+const DESIGN_WIDTH = 375;
+const DESIGN_HEIGHT = 768;
 
 const PRESET_MINES = [
   [2, 2], [2, 4], [2, 5], [2, 8], [3, 1], [3, 8],
@@ -33,7 +35,7 @@ const digModeButton = document.querySelector("#digMode");
 const flagModeButton = document.querySelector("#flagMode");
 
 const storageKey = "photo-minesweeper-scores";
-const savedScores = JSON.parse(localStorage.getItem(storageKey) || "null");
+const savedScores = readSavedScores();
 let scores = savedScores || { current: 1, best: 8 };
 let mode = "flag";
 let mines = new Set();
@@ -42,6 +44,60 @@ let flags = new Set();
 let gameOver = false;
 let hasFirstMove = false;
 let suppressNextClick = false;
+
+function setAppScale() {
+  const viewport = window.visualViewport;
+  const viewportWidth = viewport ? viewport.width : window.innerWidth;
+  const viewportHeight = viewport ? viewport.height : window.innerHeight;
+  const scale = Math.min(viewportWidth / DESIGN_WIDTH, viewportHeight / DESIGN_HEIGHT);
+  document.documentElement.style.setProperty("--app-scale", Math.max(0.1, scale).toFixed(4));
+}
+
+function lockPageZoom() {
+  const prevent = (event) => event.preventDefault();
+
+  document.addEventListener("gesturestart", prevent, { passive: false });
+  document.addEventListener("gesturechange", prevent, { passive: false });
+  document.addEventListener("gestureend", prevent, { passive: false });
+  document.addEventListener("touchmove", (event) => {
+    if (event.touches.length > 1) event.preventDefault();
+  }, { passive: false });
+
+  let lastTouchEnd = 0;
+  document.addEventListener("touchend", (event) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) event.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+
+  window.addEventListener("wheel", (event) => {
+    if (event.ctrlKey) event.preventDefault();
+  }, { passive: false });
+
+  window.addEventListener("keydown", (event) => {
+    const zoomKeys = ["+", "=", "-", "0"];
+    if ((event.ctrlKey || event.metaKey) && zoomKeys.includes(event.key)) {
+      event.preventDefault();
+    }
+  });
+}
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
+
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+  });
+}
+
+function readSavedScores() {
+  try {
+    const value = localStorage.getItem(storageKey);
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+}
 
 function key(row, col) {
   return `${row},${col}`;
@@ -92,7 +148,11 @@ function makeMineSvg() {
 function renderScores() {
   currentStreakEl.textContent = scores.current;
   allTimeEl.textContent = scores.best;
-  localStorage.setItem(storageKey, JSON.stringify(scores));
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(scores));
+  } catch {
+    // Private browsing modes can make localStorage unavailable.
+  }
 }
 
 function renderMode() {
@@ -361,3 +421,12 @@ document.querySelector(".hint-button").addEventListener("click", () => {
 renderScores();
 renderMode();
 loadPreset();
+setAppScale();
+lockPageZoom();
+registerServiceWorker();
+
+window.addEventListener("resize", setAppScale);
+window.addEventListener("orientationchange", setAppScale);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", setAppScale);
+}
