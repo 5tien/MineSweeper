@@ -27,6 +27,7 @@ let flags = new Set();
 let gameOver = false;
 let hasFirstMove = false;
 let suppressNextClick = false;
+let suppressClickCell = null;
 let revealAnimationCells = new Set();
 let revealAnimationOrigin = null;
 let revealAnimationTimer = 0;
@@ -53,13 +54,6 @@ function lockPageZoom() {
   document.addEventListener("gestureend", prevent, { passive: false });
   document.addEventListener("touchmove", (event) => {
     if (event.touches.length > 1) event.preventDefault();
-  }, { passive: false });
-
-  let lastTouchEnd = 0;
-  document.addEventListener("touchend", (event) => {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 300) event.preventDefault();
-    lastTouchEnd = now;
   }, { passive: false });
 
   window.addEventListener("wheel", (event) => {
@@ -168,11 +162,13 @@ function replayElementAnimation(element, className, duration = 520) {
   }, duration);
 }
 
-function suppressSyntheticClick() {
+function suppressSyntheticClick(id) {
   window.clearTimeout(suppressClickTimer);
   suppressNextClick = true;
+  suppressClickCell = id;
   suppressClickTimer = window.setTimeout(() => {
     suppressNextClick = false;
+    suppressClickCell = null;
   }, 700);
 }
 
@@ -439,14 +435,17 @@ function loadRandomBoard() {
 boardEl.addEventListener("click", (event) => {
   const cell = event.target.closest(".cell");
   if (!cell) return;
-  if (suppressNextClick) {
-    window.clearTimeout(suppressClickTimer);
-    suppressNextClick = false;
-    return;
-  }
-
   const row = Number(cell.dataset.row);
   const col = Number(cell.dataset.col);
+  const id = key(row, col);
+
+  if (suppressNextClick) {
+    const shouldSuppress = suppressClickCell === id;
+    window.clearTimeout(suppressClickTimer);
+    suppressNextClick = false;
+    suppressClickCell = null;
+    if (shouldSuppress) return;
+  }
 
   if (mode === "flag") {
     toggleFlag(row, col);
@@ -466,9 +465,11 @@ let pressTimer = 0;
 boardEl.addEventListener("pointerdown", (event) => {
   const cell = event.target.closest(".cell");
   if (!cell || event.pointerType === "mouse") return;
+  const row = Number(cell.dataset.row);
+  const col = Number(cell.dataset.col);
   pressTimer = window.setTimeout(() => {
-    toggleFlag(Number(cell.dataset.row), Number(cell.dataset.col));
-    suppressSyntheticClick();
+    toggleFlag(row, col);
+    suppressSyntheticClick(key(row, col));
     pressTimer = 0;
   }, 420);
 });
