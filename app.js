@@ -1,8 +1,8 @@
 const DEFAULT_ROWS = 14;
 const DEFAULT_COLS = 9;
-const MIN_ROWS = 8;
+const MIN_ROWS = 1;
 const MAX_ROWS = 18;
-const MIN_COLS = 6;
+const MIN_COLS = 4;
 const MAX_COLS = 12;
 const BOARD_WIDTH = 338;
 const BOARD_HEIGHT = 528;
@@ -39,6 +39,7 @@ const colsValueEl = document.querySelector("#colsValue");
 const rowsValueEl = document.querySelector("#rowsValue");
 const difficultyButtons = [...document.querySelectorAll("[data-difficulty]")];
 const hintButton = document.querySelector(".hint-button");
+const hintCountEl = hintButton.querySelector("span");
 const minePillEl = document.querySelector(".mine-pill");
 
 const storageKey = "minesweeper-scores-v2";
@@ -48,7 +49,8 @@ let settings = readSavedSettings();
 let pendingSettings = { ...settings };
 let rows = settings.rows;
 let cols = settings.cols;
-let scores = savedScores || { current: 0, best: 0 };
+let scores = savedScores || { current: 0, best: 0, hints: 0 };
+let hintsRemaining = scores.hints;
 let mineTotal = chooseMineTotal();
 let mode = "flag";
 let mines = new Set();
@@ -117,10 +119,16 @@ function readSavedScores() {
     const parsed = JSON.parse(value);
     const current = Number.isFinite(parsed.current) ? parsed.current : 0;
     const best = Number.isFinite(parsed.best) ? parsed.best : 0;
+    const cleanCurrent = Math.max(0, Math.floor(current));
+    const savedHints = Number.isFinite(parsed.hints) ? parsed.hints : null;
+    const milestoneCount = Math.floor(cleanCurrent / 5);
+    const fallbackHints = (milestoneCount * (milestoneCount + 1)) / 2;
+    const hints = savedHints === null ? fallbackHints : savedHints;
 
     return {
-      current: Math.max(0, Math.floor(current)),
+      current: cleanCurrent,
       best: Math.max(0, Math.floor(best)),
+      hints: cleanCurrent > 0 ? Math.max(0, Math.floor(hints)) : 0,
     };
   } catch {
     return null;
@@ -277,11 +285,27 @@ function makeMineSvg() {
 function renderScores() {
   currentStreakEl.textContent = scores.current;
   allTimeEl.textContent = scores.best;
+  scores.hints = Math.max(0, Math.floor(hintsRemaining));
   try {
     localStorage.setItem(storageKey, JSON.stringify(scores));
   } catch {
     // Private browsing modes can make localStorage unavailable.
   }
+}
+
+function hintRewardForStreak() {
+  if (scores.current === 0 || scores.current % 5 !== 0) return 0;
+  return scores.current / 5;
+}
+
+function renderHintButton() {
+  const count = Math.max(0, hintsRemaining);
+  hintCountEl.textContent = count;
+  hintButton.classList.toggle("hint-locked", count === 0);
+  hintButton.setAttribute(
+    "aria-label",
+    count === 1 ? "Hint, 1 left" : `Hint, ${count} left`
+  );
 }
 
 function renderMode() {
@@ -495,7 +519,9 @@ function revealCell(row, col) {
     gameOver = true;
     revealed.add(id);
     scores.current = 0;
+    hintsRemaining = 0;
     renderScores();
+    renderHintButton();
     renderBoard();
     const button = boardEl.querySelector(`[data-row="${row}"][data-col="${col}"]`);
     if (button) button.classList.add("exploded");
@@ -509,6 +535,40 @@ function revealCell(row, col) {
   markRevealAnimation(previousRevealed, row, col);
   checkWin();
   renderBoard();
+}
+
+function revealAroundNumber(row, col) {
+  if (gameOver) return false;
+  const id = key(row, col);
+  if (!revealed.has(id)) return false;
+
+  const count = countAdjacentMines(row, col);
+  if (count === 0) return false;
+
+  const around = neighbors(row, col);
+  const flaggedAround = around.filter(([nextRow, nextCol]) => flags.has(key(nextRow, nextCol)));
+  if (flaggedAround.length !== count) return false;
+
+  const flagsAreCorrect = flaggedAround.every(([nextRow, nextCol]) => mines.has(key(nextRow, nextCol)));
+  if (!flagsAreCorrect) {
+    triggerBoardShake();
+    return true;
+  }
+
+  const previousRevealed = new Set(revealed);
+  for (const [nextRow, nextCol] of around) {
+    const nextId = key(nextRow, nextCol);
+    if (!revealed.has(nextId) && !flags.has(nextId) && !mines.has(nextId)) {
+      revealGroup(nextRow, nextCol);
+    }
+  }
+
+  if (revealed.size === previousRevealed.size) return true;
+
+  markRevealAnimation(previousRevealed, row, col);
+  checkWin();
+  renderBoard();
+  return true;
 }
 
 function toggleFlag(row, col) {
@@ -544,7 +604,13 @@ function checkWin() {
   }
   scores.current += 1;
   scores.best = Math.max(scores.best, scores.current);
+  const earnedHints = hintRewardForStreak();
+  if (earnedHints > 0) {
+    hintsRemaining += earnedHints;
+    replayElementAnimation(hintButton, "hint-award", 760);
+  }
   renderScores();
+  renderHintButton();
   triggerWinAnimation();
 }
 
@@ -586,6 +652,7 @@ function placeMinesAroundOpening(openingRow, openingCol) {
   }
 
   mines = new Set(shuffled(allCells).slice(0, mineTotal));
+  mineTotal = mines.size;
 }
 
 function loadRandomBoard() {
@@ -603,6 +670,7 @@ function loadRandomBoard() {
   boardEl.classList.remove("board-shake", "board-win");
   renderMode();
   renderScores();
+  renderHintButton();
   renderBoard();
   triggerBoardDrop();
 }
@@ -622,6 +690,8 @@ boardEl.addEventListener("click", (event) => {
     suppressAnyClick = false;
     if (shouldSuppress) return;
   }
+
+  if (revealAroundNumber(row, col)) return;
 
   if (mode === "flag") {
     toggleFlag(row, col);
@@ -743,7 +813,11 @@ settingsApplyButton.addEventListener("click", applySettings);
 
 hintButton.addEventListener("click", () => {
   if (gameOver) return;
-  replayElementAnimation(hintButton, "hint-pulse", 650);
+  if (hintsRemaining <= 0) {
+    replayElementAnimation(hintButton, "hint-empty", 360);
+    return;
+  }
+
   const safeHidden = [];
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
@@ -754,8 +828,16 @@ hintButton.addEventListener("click", () => {
     }
   }
   const pick = safeHidden[Math.floor(Math.random() * safeHidden.length)];
-  if (pick) revealCell(pick[0], pick[1]);
-  if (!pick) replayElementAnimation(hintButton, "hint-empty", 360);
+  if (!pick) {
+    replayElementAnimation(hintButton, "hint-empty", 360);
+    return;
+  }
+
+  hintsRemaining -= 1;
+  renderHintButton();
+  renderScores();
+  replayElementAnimation(hintButton, "hint-pulse", 650);
+  revealCell(pick[0], pick[1]);
 });
 
 window.addEventListener("keydown", (event) => {
