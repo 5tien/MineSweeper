@@ -10,6 +10,7 @@ const CELL_GAP = 4;
 const MIN_CELL_SIZE = 22;
 const MAX_CELL_SIZE = 42;
 const DESIGN_WIDTH = 375;
+const DESIGN_HEIGHT = 768;
 const MAX_SCALE = 1.16;
 const TAP_MOVE_LIMIT = 12;
 const DIFFICULTIES = Object.freeze({
@@ -77,7 +78,12 @@ let touchPress = null;
 function setAppScale() {
   const viewport = window.visualViewport;
   const viewportWidth = viewport ? viewport.width : window.innerWidth;
-  const scale = Math.min(viewportWidth / DESIGN_WIDTH, MAX_SCALE);
+  const viewportHeight = viewport ? viewport.height : window.innerHeight;
+  const scale = Math.min(
+    viewportWidth / DESIGN_WIDTH,
+    viewportHeight / DESIGN_HEIGHT,
+    MAX_SCALE
+  );
   document.documentElement.style.setProperty("--app-scale", Math.max(0.1, scale).toFixed(4));
 }
 
@@ -88,8 +94,12 @@ function lockPageZoom() {
   document.addEventListener("gesturechange", prevent, { passive: false });
   document.addEventListener("gestureend", prevent, { passive: false });
   document.addEventListener("touchmove", (event) => {
-    if (event.touches.length > 1) event.preventDefault();
+    event.preventDefault();
   }, { passive: false });
+
+  window.addEventListener("scroll", () => {
+    window.scrollTo(0, 0);
+  }, { passive: true });
 
   window.addEventListener("wheel", (event) => {
     if (event.ctrlKey) event.preventDefault();
