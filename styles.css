@@ -266,8 +266,7 @@ button:focus-visible {
   box-shadow: inset 0 0 0 1px var(--tile-edge), 0 1px 1px rgba(0, 0, 0, 0.08);
 }
 
-.board.board-drop .cell.hidden,
-.board.board-drop .cell.flagged {
+.cell.cell-drop-in {
   animation: tileDropIn 440ms cubic-bezier(0.18, 0.88, 0.25, 1.18) both;
   animation-delay: var(--drop-delay);
 }
@@ -1345,8 +1344,7 @@ button:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .board.board-drop .cell.hidden,
-  .board.board-drop .cell.flagged,
+  .cell.cell-drop-in,
   .cell.revealed-new::after,
   .cell.flag-new .cell-flag-icon,
   .cell.flag-removed .cell-flag-icon,

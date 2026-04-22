@@ -1,4 +1,4 @@
-const CACHE_NAME = "minesweeper-pwa-v50";
+const CACHE_NAME = "minesweeper-pwa-v56";
 const APP_SHELL = [
   "./",
   "./index.html",

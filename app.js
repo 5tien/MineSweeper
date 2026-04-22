@@ -73,7 +73,9 @@ let unflagAnimationCells = new Set();
 let flagAnimationTimer = 0;
 let suppressClickTimer = 0;
 let settingsCloseTimer = 0;
+let boardInteractionLockedUntil = 0;
 let touchPress = null;
+const BOARD_DROP_LOCK_MS = 260;
 
 function setAppScale() {
   const viewport = window.visualViewport;
@@ -439,13 +441,80 @@ function renderBoard() {
   minePillEl.dataset.digits = String(remainingMines).length;
 }
 
-function triggerBoardDrop() {
+function syncMineCounter() {
+  const remainingMines = Math.max(0, mineTotal - flags.size);
+  mineCountEl.textContent = remainingMines;
+  minePillEl.dataset.digits = String(remainingMines).length;
+}
+
+function syncCell(row, col) {
+  const button = boardEl.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+  if (!button) return;
+
+  const id = key(row, col);
+  const isRevealed = revealed.has(id);
+  const isFlagged = flags.has(id);
+  const isMine = mines.has(id);
+  const count = countAdjacentMines(row, col);
+
+  let className = "cell";
+  let label = `Cell ${row + 1}, ${col + 1}`;
+  let content = "";
+  let dataCount = "";
+
+  if (isRevealed) {
+    className += " revealed";
+    if (isMine) {
+      className += " mine";
+      content = makeMineSvg();
+      label += ", mine";
+    } else if (count > 0) {
+      dataCount = ` data-count="${count}"`;
+      content = String(count);
+      label += `, ${count}`;
+    } else {
+      dataCount = ' data-count="0"';
+      label += ", empty";
+    }
+  } else if (isFlagged) {
+    className += " flagged";
+    if (flagAnimationCells.has(id)) className += " flag-new";
+    content = makeFlagSvg();
+    label += ", flagged";
+  } else {
+    className += " hidden";
+    if (unflagAnimationCells.has(id)) {
+      className += " flag-removed";
+      content = makeFlagSvg();
+    }
+  }
+
+  button.className = className;
+  button.setAttribute("aria-label", label);
+  if (dataCount) button.setAttribute("data-count", dataCount.match(/\d+/)?.[0] || "0");
+  else button.removeAttribute("data-count");
+  button.innerHTML = content;
+}
+
+function cancelBoardDropAnimation() {
   window.clearTimeout(boardDropTimer);
-  boardEl.classList.remove("board-drop");
+  const dropCells = [...boardEl.querySelectorAll(".cell-drop-in")];
+  for (const cell of dropCells) {
+    cell.classList.remove("cell-drop-in");
+  }
+}
+
+function triggerBoardDrop() {
+  cancelBoardDropAnimation();
+  const dropCells = [...boardEl.querySelectorAll(".cell.hidden, .cell.flagged")];
   void boardEl.offsetWidth;
-  boardEl.classList.add("board-drop");
+  for (const cell of dropCells) {
+    cell.classList.add("cell-drop-in");
+  }
   boardDropTimer = window.setTimeout(() => {
-    boardEl.classList.remove("board-drop");
+    for (const cell of dropCells) {
+      if (cell.isConnected) cell.classList.remove("cell-drop-in");
+    }
   }, 950);
 }
 
@@ -471,11 +540,20 @@ function triggerWinAnimation() {
   }, 1200);
 }
 
-function markRevealAnimation(previousRevealed, originRow, originCol) {
+function markRevealAnimation(previousRevealed, originRow, originCol, options = {}) {
   window.clearTimeout(revealAnimationTimer);
-  revealAnimationCells = new Set(
-    [...revealed].filter((id) => !previousRevealed.has(id))
-  );
+  const maxCells = options.maxCells || Infinity;
+  const nextCells = [...revealed]
+    .filter((id) => !previousRevealed.has(id))
+    .sort((left, right) => {
+      const [leftRow, leftCol] = left.split(",").map(Number);
+      const [rightRow, rightCol] = right.split(",").map(Number);
+      const leftDistance = Math.abs(leftRow - originRow) + Math.abs(leftCol - originCol);
+      const rightDistance = Math.abs(rightRow - originRow) + Math.abs(rightCol - originCol);
+      return leftDistance - rightDistance;
+    });
+
+  revealAnimationCells = new Set(nextCells.slice(0, maxCells));
   revealAnimationOrigin = [originRow, originCol];
   revealAnimationTimer = window.setTimeout(() => {
     revealAnimationCells = new Set();
@@ -518,7 +596,9 @@ function revealCell(row, col) {
   if (gameOver) return;
   const id = key(row, col);
   if (flags.has(id) || revealed.has(id)) return;
+  cancelBoardDropAnimation();
   const previousRevealed = new Set(revealed);
+  const isOpeningMove = !hasFirstMove;
 
   if (!hasFirstMove) {
     placeMinesAroundOpening(row, col);
@@ -542,7 +622,7 @@ function revealCell(row, col) {
   }
 
   revealGroup(row, col);
-  markRevealAnimation(previousRevealed, row, col);
+  markRevealAnimation(previousRevealed, row, col, { maxCells: isOpeningMove ? 12 : Infinity });
   checkWin();
   renderBoard();
 }
@@ -551,6 +631,7 @@ function revealAroundNumber(row, col) {
   if (gameOver) return false;
   const id = key(row, col);
   if (!revealed.has(id)) return false;
+  cancelBoardDropAnimation();
 
   const count = countAdjacentMines(row, col);
   if (count === 0) return false;
@@ -585,6 +666,7 @@ function toggleFlag(row, col) {
   if (gameOver) return;
   const id = key(row, col);
   if (revealed.has(id)) return;
+  const isFlagging = !flags.has(id);
 
   if (flags.has(id)) {
     flags.delete(id);
@@ -601,7 +683,14 @@ function toggleFlag(row, col) {
 
   replayElementAnimation(minePillEl, "mine-pill-pop", 420);
   checkWin();
-  renderBoard();
+  syncMineCounter();
+  syncCell(row, col);
+
+  if (!isFlagging) {
+    window.setTimeout(() => {
+      if (!flags.has(id) && !revealed.has(id)) syncCell(row, col);
+    }, 540);
+  }
 }
 
 function checkWin() {
@@ -676,16 +765,17 @@ function loadRandomBoard() {
   unflagAnimationCells = new Set();
   gameOver = false;
   hasFirstMove = false;
-  mode = "dig";
   boardEl.classList.remove("board-shake", "board-win");
   renderMode();
   renderScores();
   renderHintButton();
   renderBoard();
+  boardInteractionLockedUntil = window.performance.now() + BOARD_DROP_LOCK_MS;
   triggerBoardDrop();
 }
 
 boardEl.addEventListener("click", (event) => {
+  if (window.performance.now() < boardInteractionLockedUntil) return;
   const cell = event.target.closest(".cell");
   if (!cell) return;
   const row = Number(cell.dataset.row);
@@ -711,6 +801,7 @@ boardEl.addEventListener("click", (event) => {
 });
 
 boardEl.addEventListener("contextmenu", (event) => {
+  if (window.performance.now() < boardInteractionLockedUntil) return;
   const cell = event.target.closest(".cell");
   if (!cell) return;
   event.preventDefault();
@@ -719,6 +810,7 @@ boardEl.addEventListener("contextmenu", (event) => {
 
 let pressTimer = 0;
 boardEl.addEventListener("pointerdown", (event) => {
+  if (window.performance.now() < boardInteractionLockedUntil) return;
   const cell = event.target.closest(".cell");
   if (!cell || event.pointerType === "mouse") return;
   const row = Number(cell.dataset.row);
