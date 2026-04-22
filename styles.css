@@ -827,6 +827,79 @@ button:focus-visible {
   background: var(--green);
 }
 
+.resume-overlay {
+  align-items: center;
+  padding-top: 0;
+}
+
+.resume-menu {
+  width: 282px;
+  padding-bottom: 14px;
+}
+
+.resume-head {
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.resume-head h2 {
+  color: var(--yellow);
+}
+
+.resume-copy {
+  height: 34px;
+  display: grid;
+  place-items: center;
+  margin: 4px 0 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #eef3f6;
+  font-size: 11px;
+  line-height: 12px;
+  font-weight: 1000;
+  -webkit-text-stroke: 0.25px currentColor;
+  paint-order: stroke fill;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.055),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.13);
+}
+
+.resume-actions {
+  height: 46px;
+  display: grid;
+  grid-template-columns: 1fr 90px;
+  gap: 8px;
+}
+
+.resume-continue,
+.resume-new {
+  width: 100%;
+  height: 46px;
+  border: 0;
+  border-radius: 6px;
+  color: #202932;
+  font-size: 15px;
+  line-height: 16px;
+  font-weight: 1000;
+  cursor: pointer;
+  -webkit-text-stroke: 0.42px currentColor;
+  paint-order: stroke fill;
+}
+
+.resume-continue {
+  background: var(--green);
+}
+
+.resume-new {
+  background: var(--red);
+  color: #421817;
+}
+
+.resume-continue.settings-control-pop,
+.resume-new.settings-control-pop {
+  animation: controlPop 250ms cubic-bezier(0.18, 0.9, 0.25, 1.16) both;
+}
+
 .difficulty-options button.settings-control-pop,
 .settings-classic.settings-control-pop,
 .settings-apply.settings-control-pop {
@@ -1364,6 +1437,8 @@ button:focus-visible {
   .settings-overlay,
   .settings-overlay.settings-closing .settings-menu,
   .difficulty-options button.settings-control-pop,
+  .resume-continue.settings-control-pop,
+  .resume-new.settings-control-pop,
   .settings-classic.settings-control-pop,
   .settings-apply.settings-control-pop,
   .settings-button.settings-pop svg,

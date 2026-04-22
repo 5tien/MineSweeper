@@ -32,6 +32,9 @@ const settingsPanel = document.querySelector("#settingsPanel");
 const settingsCloseButton = document.querySelector("#settingsClose");
 const settingsApplyButton = document.querySelector("#settingsApply");
 const settingsClassicButton = document.querySelector("#settingsClassic");
+const resumePanel = document.querySelector("#resumePanel");
+const resumeContinueButton = document.querySelector("#resumeContinue");
+const resumeNewButton = document.querySelector("#resumeNew");
 const colsDownButton = document.querySelector("#colsDown");
 const colsUpButton = document.querySelector("#colsUp");
 const rowsDownButton = document.querySelector("#rowsDown");
@@ -45,6 +48,7 @@ const minePillEl = document.querySelector(".mine-pill");
 
 const storageKey = "minesweeper-scores-v2";
 const settingsStorageKey = "minesweeper-settings-v1";
+const gameStorageKey = "minesweeper-game-v1";
 const savedScores = readSavedScores();
 let settings = readSavedSettings();
 let pendingSettings = { ...settings };
@@ -76,6 +80,10 @@ let settingsCloseTimer = 0;
 let boardInteractionLockedUntil = 0;
 let touchPress = null;
 const BOARD_DROP_LOCK_MS = 260;
+let isRestoringGame = false;
+let hasLoadedBoard = false;
+let resumeChoicePending = false;
+let pendingResumeGame = null;
 
 function setAppScale() {
   const viewport = window.visualViewport;
@@ -189,6 +197,81 @@ function saveSettings() {
   }
 }
 
+function serializeSet(values) {
+  return [...values];
+}
+
+function readSavedGame() {
+  try {
+    const value = localStorage.getItem(gameStorageKey);
+    if (!value) return null;
+
+    const parsed = JSON.parse(value);
+    const savedRows = Number.isFinite(parsed.rows) ? Math.floor(parsed.rows) : 0;
+    const savedCols = Number.isFinite(parsed.cols) ? Math.floor(parsed.cols) : 0;
+    const savedMineTotal = Number.isFinite(parsed.mineTotal) ? Math.floor(parsed.mineTotal) : 0;
+
+    if (savedRows < MIN_ROWS || savedRows > MAX_ROWS || savedCols < MIN_COLS || savedCols > MAX_COLS) return null;
+    if (!DIFFICULTIES[parsed.difficulty]) return null;
+    if (!Array.isArray(parsed.mines) || !Array.isArray(parsed.revealed) || !Array.isArray(parsed.flags)) return null;
+
+    return {
+      rows: savedRows,
+      cols: savedCols,
+      difficulty: parsed.difficulty,
+      mineTotal: Math.max(0, savedMineTotal),
+      mines: parsed.mines,
+      revealed: parsed.revealed,
+      flags: parsed.flags,
+      gameOver: Boolean(parsed.gameOver),
+      hasFirstMove: Boolean(parsed.hasFirstMove),
+      mode: parsed.mode === "dig" ? "dig" : "flag",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveGameState() {
+  if (isRestoringGame || !hasLoadedBoard || resumeChoicePending) return;
+
+  try {
+    localStorage.setItem(gameStorageKey, JSON.stringify({
+      rows,
+      cols,
+      difficulty: settings.difficulty,
+      mineTotal,
+      mines: serializeSet(mines),
+      revealed: serializeSet(revealed),
+      flags: serializeSet(flags),
+      gameOver,
+      hasFirstMove,
+      mode,
+    }));
+  } catch {
+    // Private browsing modes can make localStorage unavailable.
+  }
+}
+
+function clearSavedGame() {
+  try {
+    localStorage.removeItem(gameStorageKey);
+  } catch {
+    // Private browsing modes can make localStorage unavailable.
+  }
+}
+
+function showResumePrompt(savedGame) {
+  pendingResumeGame = savedGame;
+  resumeChoicePending = true;
+  resumePanel.hidden = false;
+}
+
+function closeResumePrompt() {
+  resumePanel.hidden = true;
+  resumeChoicePending = false;
+}
+
 function renderSettingsControls() {
   colsValueEl.textContent = pendingSettings.cols;
   rowsValueEl.textContent = pendingSettings.rows;
@@ -255,6 +338,7 @@ function applySettings() {
   replayElementAnimation(settingsApplyButton, "settings-control-pop", 260);
 
   if (didChange) {
+    clearSavedGame();
     loadRandomBoard();
   }
 }
@@ -618,6 +702,7 @@ function revealCell(row, col) {
     triggerBoardShake();
     replayElementAnimation(minePillEl, "mine-pill-danger", 680);
     replayElementAnimation(currentStreakEl.parentElement, "counter-drop", 520);
+    saveGameState();
     return;
   }
 
@@ -625,6 +710,7 @@ function revealCell(row, col) {
   markRevealAnimation(previousRevealed, row, col, { maxCells: isOpeningMove ? 12 : Infinity });
   checkWin();
   renderBoard();
+  saveGameState();
 }
 
 function revealAroundNumber(row, col) {
@@ -659,6 +745,7 @@ function revealAroundNumber(row, col) {
   markRevealAnimation(previousRevealed, row, col);
   checkWin();
   renderBoard();
+  saveGameState();
   return true;
 }
 
@@ -691,6 +778,7 @@ function toggleFlag(row, col) {
       if (!flags.has(id) && !revealed.has(id)) syncCell(row, col);
     }, 540);
   }
+  saveGameState();
 }
 
 function checkWin() {
@@ -711,6 +799,7 @@ function checkWin() {
   renderScores();
   renderHintButton();
   triggerWinAnimation();
+  saveGameState();
 }
 
 function randomInt(min, max) {
@@ -755,6 +844,8 @@ function placeMinesAroundOpening(openingRow, openingCol) {
 }
 
 function loadRandomBoard() {
+  clearSavedGame();
+  hasLoadedBoard = false;
   mineTotal = chooseMineTotal();
   mines = new Set();
   revealed = new Set();
@@ -772,6 +863,43 @@ function loadRandomBoard() {
   renderBoard();
   boardInteractionLockedUntil = window.performance.now() + BOARD_DROP_LOCK_MS;
   triggerBoardDrop();
+  hasLoadedBoard = true;
+  saveGameState();
+}
+
+function restoreSavedBoard(savedGame) {
+  isRestoringGame = true;
+  hasLoadedBoard = false;
+  settings = {
+    rows: savedGame.rows,
+    cols: savedGame.cols,
+    difficulty: savedGame.difficulty,
+  };
+  pendingSettings = { ...settings };
+  rows = savedGame.rows;
+  cols = savedGame.cols;
+  mineTotal = savedGame.mineTotal;
+  mines = new Set(savedGame.mines);
+  revealed = new Set(savedGame.revealed);
+  flags = new Set(savedGame.flags);
+  revealAnimationCells = new Set();
+  revealAnimationOrigin = null;
+  flagAnimationCells = new Set();
+  unflagAnimationCells = new Set();
+  gameOver = savedGame.gameOver;
+  hasFirstMove = savedGame.hasFirstMove;
+  mode = savedGame.mode;
+  boardEl.classList.remove("board-shake", "board-win");
+  saveSettings();
+  renderSettingsControls();
+  renderMode();
+  renderScores();
+  renderHintButton();
+  renderBoard();
+  boardInteractionLockedUntil = 0;
+  hasLoadedBoard = true;
+  isRestoringGame = false;
+  saveGameState();
 }
 
 boardEl.addEventListener("click", (event) => {
@@ -868,12 +996,14 @@ digModeButton.addEventListener("click", () => {
   mode = "dig";
   renderMode();
   replayElementAnimation(digModeButton, "tool-pop", 330);
+  saveGameState();
 });
 
 flagModeButton.addEventListener("click", () => {
   mode = "flag";
   renderMode();
   replayElementAnimation(flagModeButton, "tool-pop", 330);
+  saveGameState();
 });
 
 resetButton.addEventListener("click", () => {
@@ -913,6 +1043,21 @@ for (const button of difficultyButtons) {
 
 settingsApplyButton.addEventListener("click", applySettings);
 
+resumeContinueButton.addEventListener("click", () => {
+  replayElementAnimation(resumeContinueButton, "settings-control-pop", 260);
+  closeResumePrompt();
+  if (pendingResumeGame) restoreSavedBoard(pendingResumeGame);
+  pendingResumeGame = null;
+});
+
+resumeNewButton.addEventListener("click", () => {
+  replayElementAnimation(resumeNewButton, "settings-control-pop", 260);
+  closeResumePrompt();
+  pendingResumeGame = null;
+  clearSavedGame();
+  loadRandomBoard();
+});
+
 hintButton.addEventListener("click", () => {
   if (gameOver) return;
   if (hintsRemaining <= 0) {
@@ -938,9 +1083,16 @@ hintButton.addEventListener("click", () => {
   hintsRemaining -= 1;
   renderHintButton();
   renderScores();
+  saveGameState();
   replayElementAnimation(hintButton, "hint-pulse", 650);
   revealCell(pick[0], pick[1]);
 });
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") saveGameState();
+});
+
+window.addEventListener("beforeunload", saveGameState);
 
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !settingsPanel.hidden) closeSettings();
@@ -950,7 +1102,12 @@ renderScores();
 renderMode();
 renderSettingsControls();
 setAppScale();
-loadRandomBoard();
+const savedGame = readSavedGame();
+if (savedGame) {
+  showResumePrompt(savedGame);
+} else {
+  loadRandomBoard();
+}
 lockPageZoom();
 registerServiceWorker();
 
